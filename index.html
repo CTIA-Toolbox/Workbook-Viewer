@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>Results Archive</title>
+
+  <link rel="manifest" href="./manifest.json?v=1" />
+  <link rel="stylesheet" href="./styles.css?v=36" />
+
+
+ 
+
+  <!-- Excel export (styled XLSX). Loaded from CDN. -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-title">
+      <h1>Results Archive</h1>
+    </div>
+  <!-- Egnyte Modal -->
+  <div id="egnyteModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+      <button id="egnyteModalClose" class="modal-close" title="Close">&times;</button>
+      <h2 class="modal-title">Egnyte Folder Access</h2>
+      <div id="egnyteModalContent">Loading…</div>
+    </div>
+  </div>
+
+    <div class="app-controls">
+      <label class="file">
+        <span class="label">Load Building Results.pkl</span>
+        <div class="file-row">
+          <input id="fileInput" type="file" accept=".pkl,.pickle,application/octet-stream" />
+        </div>
+        <div id="lastDatasetInfo" class="muted small"></div>
+      </label>
+
+      <label class="file">
+        <span class="label">Load Correlated Calls.pkl</span>
+        <div class="file-row">
+          <input id="callFileInput" type="file" accept=".pkl,.pickle,application/octet-stream" />
+        </div>
+        <div class="muted small">Optional: load only if you want Call Data exports (Excel/KML).</div>
+        <div id="lastCallDatasetInfo" class="muted small"></div>
+      </label>
+
+      <div class="building-picker">
+        <div class="building-picker-head">
+          <span class="label">Building(s)</span>
+          <div class="building-picker-actions">
+            <button id="selectAllBuildings" class="btn btn-small" disabled>Select all</button>
+            <button id="clearBuildings" class="btn btn-small" disabled>Clear</button>
+          </div>
+        </div>
+        <select id="buildingSelect" multiple size="4" disabled></select>
+        <div class="building-text-actions">
+          <input id="buildingText" type="text" disabled placeholder="Or type comma-separated (e.g., ATLDBC50, CHIDBC12)" />
+          <button id="applyBuildingText" class="btn btn-small" disabled>Apply</button>
+          <button id="clearBuildingText" class="btn btn-small" disabled>Clear</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <section class="status" aria-live="polite">
+      <div id="statusText" class="status-text">Upload a .pkl file to begin.</div>
+
+      <details id="filtersDetails" class="status-details hidden">
+        <summary>Filters</summary>
+        <div id="filtersHint" class="muted" style="margin-top: 8px;">Load a file to enable filters.</div>
+        <div id="filtersContainer" class="filters"></div>
+        <div class="filters-actions">
+          <button id="clearFilters" class="btn" disabled>Clear filters</button>
+          <button id="egnyteBtn" class="btn btn-small" type="button" style="margin-left:1em;">Go to Egnyte</button>
+        </div>
+      </details>
+    </section>
+
+    <section id="gridCard" class="grid-card hidden">
+      <div class="grid-toolbar">
+        <div class="muted" id="gridSummary">No data loaded.</div>
+        <div class="grid-tools">
+          <label>
+            <span class="label">Scale</span>
+            <select id="zoomSelect" disabled>
+              <option value="1">100%</option>
+              <option value="0.9">90%</option>
+              <option value="0.8">80%</option>
+              <option value="0.7">70%</option>
+              <option value="0.6">60%</option>
+            </select>
+          </label>
+          <button id="exportExcel" class="btn btn-small" disabled>Export Excel</button>
+        </div>
+      </div>
+      <div id="gridContainer" class="grid-container">
+        <div class="placeholder">Waiting for dataset…</div>
+      </div>
+    </section>
+
+    <section id="callCard" class="grid-card hidden">
+      <div class="grid-toolbar">
+        <div class="muted" id="callSummary">No call data loaded.</div>
+        <div class="grid-tools">
+          <button id="callViewToggleBtn" class="btn btn-small" disabled>View Call Data</button>
+          <button id="callLocationSourceBtn" class="btn btn-small" disabled>Location Source: All</button>
+          <button id="exportCallsExcel" class="btn btn-small" disabled>Export Call Data</button>
+          <button id="exportCallsKml" class="btn btn-small" disabled>Export KML</button>
+        </div>
+      </div>
+      <div id="callTableContainer" class="grid-container">
+        <div class="placeholder">Load call data to enable export.</div>
+      </div>
+    </section>
+
+    <section id="debugSection" class="status">
+      <details class="status-details">
+        <summary>Detected columns</summary>
+        <pre id="columnsPreview" class="pre"></pre>
+      </details>
+
+      <details class="status-details">
+        <summary>Debug log</summary>
+        <pre id="debugLog" class="pre"></pre>
+      </details>
+    </section>
+  </main>
+
+  <footer class="app-footer muted">
+    <strong id="buildStamp">dev-198</strong>
+  </footer>
+
+
+<!-- Load the app module with a visible error fallback (so failures aren't silent). -->
+<script type="module" src="./app.js"></script>
+
+<!-- Inline error logging + global handlers -->
+<script>
+  const logEl = document.getElementById('debugLog');
+  const statusEl = document.getElementById('statusText');
+
+  const log = (msg) => {
+    if (!logEl) return;
+    const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logEl.textContent += (logEl.textContent ? "\n" : "") + line;
+  };
+
+  window.addEventListener('error', function(e) {
+    alert('A JavaScript error occurred: ' + e.message + '\n' + (e.filename || '') + ':' + (e.lineno || ''));
+    log('Global error: ' + e.message + ' at ' + (e.filename || '') + ':' + (e.lineno || ''));
+  });
+
+  window.addEventListener('unhandledrejection', function(e) {
+    alert('A JavaScript promise error occurred: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+    log('Global promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  });
+
+  log('Bootstrapping app module…');
+</script>
+
+
+
+<!-- Service worker registration -->
+<script>
+  // Basic SW registration for the app shell.
+  // (Service worker doesn't cache Pyodide CDN assets by default.)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js').then((reg) => {
+        // Encourage quick updates while iterating.
+        reg.update().catch(() => {});
+      }).catch(() => {});
+    });
+  }
+</script>
+
+</body>
+</html>
