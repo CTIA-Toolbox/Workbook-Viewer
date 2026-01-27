@@ -1921,30 +1921,6 @@ function enableControls(enabled) {
   if (els.clearBuildingText) els.clearBuildingText.disabled = !buildingEnabled;
 }
 
-function updateSectionsVisibility() {
-  const hasArchive = state.records.length > 0;
-  const hasCalls = callState.records.length > 0;
-  const hasAnyData = hasArchive || hasCalls;
-
-  const needsBuildingArchive = Boolean(state.dimCols.building);
-  const needsBuildingCalls = Boolean(callState.dimCols.building);
-  const needsBuildingAny = needsBuildingArchive || needsBuildingCalls;
-  const hasSelectedBuilding = state.filters.building && state.filters.building.size > 0;
-  const showFilters = hasAnyData && (!needsBuildingAny || hasSelectedBuilding);
-  const showGrid = hasArchive;
-  const showCalls = hasCalls && (!needsBuildingCalls || hasSelectedBuilding);
-  const showDebug = hasAnyData;
-
-  const toggle = (el, on) => {
-    if (!el) return;
-    el.classList.toggle('hidden', !on);
-  };
-
-  toggle(els.filtersDetails, showFilters);
-  toggle(els.gridCard, showGrid);
-  toggle(els.callCard, showCalls);
-  toggle(els.debugSection, showDebug);
-}
 
 // ...removed call to updateSectionsVisibility(); no longer needed in minimal PWA...
 
@@ -2028,7 +2004,7 @@ function applyBuildingTextFilter() {
   applyFilters();
   buildFiltersUI();
   render();
-  updateSectionsVisibility();
+  // updateSectionsVisibility(); (removed for minimal PWA)
   setStatus(state.filters.building.size ? 'Building selection applied.' : 'Select building(s) above to begin.');
 }
 
