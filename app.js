@@ -166,6 +166,9 @@ console.log('REACHED 3: AFTER_EGNYTE_LISTENER_SETUP');
 console.log('REACHED 4: BEFORE_ELS_BLOCK');
 const els = {
   fileInput: document.getElementById('fileInput'),
+  fileInputLabel: document.getElementById('fileInputLabel'),
+  exportBtn: document.getElementById('exportBtn'),
+  statusEl: document.getElementById('status'),
   statusText: document.getElementById('statusText'),
   debugLog: document.getElementById('debugLog'),
 };
@@ -3034,23 +3037,95 @@ if (els.clearBuildings && els.buildingSelect) {
 
 
 
-// File input events — minimal version
-function attachFileInputListeners() {
-  if (!els.fileInput) return;
-  els.fileInput.addEventListener('click', () => {
-    try { els.fileInput.value = ''; } catch (e) {}
-  });
-  els.fileInput.addEventListener('change', function(event) {
-    const file = els.fileInput.files?.[0];
-    if (!file) return;
-    // Placeholder: handle file for KML generation
-    setStatus('File selected: ' + file.name);
-    logDebug('File selected: ' + file.name);
-    // TODO: Implement KML generation logic here
+
+// File input label update
+if (els.fileInput && els.fileInputLabel) {
+  els.fileInput.addEventListener('change', () => {
+    if (els.fileInput.files && els.fileInput.files.length > 0) {
+      els.fileInputLabel.textContent = els.fileInput.files[0].name;
+    } else {
+      els.fileInputLabel.textContent = 'No file chosen';
+    }
   });
 }
-attachFileInputListeners();
-window.addEventListener('DOMContentLoaded', () => attachFileInputListeners());
+
+// Export button wiring
+if (els.exportBtn) {
+  els.exportBtn.addEventListener('click', handleExport);
+}
+
+// Main export handler
+async function handleExport() {
+  if (!els.statusEl) return;
+  els.statusEl.textContent = '';
+
+  if (!els.fileInput || !els.fileInput.files || els.fileInput.files.length === 0) {
+    els.statusEl.textContent = 'Please select an Excel workbook.';
+    return;
+  }
+  const file = els.fileInput.files[0];
+
+  // Read correlation sheet
+  if (typeof readCorrelationSheet !== 'function') {
+    els.statusEl.textContent = 'readCorrelationSheet() not available.';
+    return;
+  }
+  const result = await readCorrelationSheet(file);
+  if (!result.ok) {
+    els.statusEl.textContent = 'Error: ' + result.error;
+    return;
+  }
+
+  const rows = result.rows;
+  if (!rows.length) {
+    els.statusEl.textContent = 'No data rows found.';
+    return;
+  }
+
+  // Determine Stage + Building ID from first row
+  const stage = rows[0].stage;
+  const building = rows[0].building;
+
+  const filtered = rows.filter(r =>
+    r.stage === stage &&
+    r.building === building
+  );
+
+  if (!filtered.length) {
+    els.statusEl.textContent = 'No matching rows for Stage/Building.';
+    return;
+  }
+
+  // Build KML
+  if (typeof buildCallKmlFromRows !== 'function') {
+    els.statusEl.textContent = 'KML builder not available.';
+    return;
+  }
+  const kml = buildCallKmlFromRows({
+    rows: filtered,
+    docName: `Correlation KML — ${building} (${filtered.length} points)`,
+    groupByParticipant: true
+  });
+
+  if (!kml) {
+    els.statusEl.textContent = 'KML generation failed.';
+    return;
+  }
+
+  // Download
+  if (typeof downloadTextFile !== 'function') {
+    els.statusEl.textContent = 'Download function not available.';
+    return;
+  }
+  const filename = `Correlation_${building}.kml`;
+  downloadTextFile({
+    filename,
+    text: kml,
+    mime: 'application/vnd.google-earth.kml+xml;charset=utf-8'
+  });
+
+  els.statusEl.textContent = `Exported: ${filename}`;
+}
 
 // Call-data file input events
 if (els.callFileInput) {
