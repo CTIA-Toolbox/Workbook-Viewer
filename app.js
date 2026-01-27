@@ -3121,6 +3121,7 @@ async function handleExport() {
     els.statusEl.textContent = 'readCorrelationSheet() not available.';
     return;
   }
+
   const result = await readCorrelationSheet(file);
   if (!result.ok) {
     els.statusEl.textContent = 'Error: ' + result.error;
@@ -3136,19 +3137,6 @@ async function handleExport() {
   }
 
   // Debug: call buildFilters and log
-  buildFilters(rows);
-
-  // Determine Stage + Building ID from first row
-  const stage = rows[0].stage;
-  const building = rows[0].building;
-
-  const rows = result.rows;
-  if (!rows.length) {
-    els.statusEl.textContent = 'No data rows found.';
-    return;
-  }
-
-  // Build dynamic filters before filtering
   buildFilters(rows);
 
   // Determine Stage + Building ID from first row
