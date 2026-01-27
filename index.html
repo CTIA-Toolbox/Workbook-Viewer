@@ -34,15 +34,17 @@
           <input id="fileInput" type="file" accept=".xlsx,.xls" style="margin-bottom:12px;">
           <span id="fileInputLabel" class="file-label">No file chosen</span>
         </div>
-      <div id="filterContainer" class="filter-container"></div>
       </label>
+
+      <!-- Filters must be OUTSIDE the label -->
+      <div id="filterContainer" class="filter-container"></div>
       <button id="exportBtn" class="primary-btn" style="margin-top:12px;">Generate KML</button>
       <div id="status" class="status-line"></div>
     </section>
   </main>
 
   <footer class="app-footer muted">
-    <strong id="buildStamp">dev-19</strong>
+    <strong id="buildStamp">dev-20</strong>
   </footer>
 
 
