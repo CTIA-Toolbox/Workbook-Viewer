@@ -43,9 +43,28 @@ fileInput.addEventListener('change', async () => {
 
 function buildFilters(rows) {
 	filterContainer.innerHTML = '';
+	// Map of internal key to actual column name
+	const keyToLabel = {
+		stage: 'Stage',
+		building: 'Building ID',
+		path: 'Path ID',
+		point: 'Point ID',
+		completed: 'Completed Call',
+		correlated: 'Correlated Call',
+		participant: 'Participant',
+		os: 'Handset OS',
+		source: 'Location Source',
+		phone: 'Location Phone Number',
+		lat: 'Location Latitude',
+		lon: 'Location Longitude',
+		alt: 'Location Altitude',
+		validH: 'Valid Horizontal Location',
+		validV: 'Valid Vertical Location',
+		chosen: 'Chosen Location'
+	};
 	const filterableKeys = [
 		'path', 'point', 'completed', 'correlated', 'participant',
-		'os', 'source', 'phone', 'lat', 'lon', 'alt',
+		'os', 'source', 'phone',
 		'validH', 'validV', 'chosen'
 	];
 	for (const key of filterableKeys) {
@@ -54,7 +73,7 @@ function buildFilters(rows) {
 		const row = document.createElement('div');
 		row.className = 'filter-row';
 		const label = document.createElement('label');
-		label.textContent = key;
+		label.textContent = keyToLabel[key] || key;
 		const select = document.createElement('select');
 		select.dataset.key = key;
 		const optAll = document.createElement('option');

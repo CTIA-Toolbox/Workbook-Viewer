@@ -1,3 +1,11 @@
+/* Horizontal button row for export/status */
+.button-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 1em;
+  margin-top: 12px;
+}
 /* Filter container and filter row styles */
 
 .filter-container {
@@ -25,11 +33,23 @@
 }
 
 .filter-row select {
-  padding: 6px;
+  padding: 6px 28px 6px 8px;
   border-radius: 6px;
   background: var(--card);
   color: var(--text);
   border: 1px solid var(--border);
+  font-size: 1em;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+.filter-row select:focus {
+  outline: none;
+  border-color: var(--primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
 }
 .egnyte-link-row {
   display: flex;
