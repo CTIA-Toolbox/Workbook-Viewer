@@ -1,7 +1,12 @@
 // Build dynamic filters for all columns except Stage and Building ID
 function buildFilters(rows) {
+  console.log("buildFilters called with rows:", rows);
   const container = document.getElementById('filterContainer');
-  if (!container) return;
+  console.log("filterContainer:", container);
+  if (!container) {
+    console.log("filterContainer is null!");
+    return;
+  }
   container.innerHTML = '';
 
   const filterableKeys = [
@@ -12,6 +17,7 @@ function buildFilters(rows) {
 
   for (const key of filterableKeys) {
     const values = [...new Set(rows.map(r => r[key]).filter(v => v !== null && v !== undefined))];
+    console.log(`Column ${key} unique values:`, values);
     if (values.length <= 1) continue;
 
     const row = document.createElement('div');
@@ -3099,6 +3105,8 @@ if (els.exportBtn) {
 
 // Main export handler
 async function handleExport() {
+  // Debug: log when handleExport runs
+  console.log("handleExport called");
   if (!els.statusEl) return;
   els.statusEl.textContent = '';
 
@@ -3119,6 +3127,20 @@ async function handleExport() {
     return;
   }
 
+  // Debug: log rows length
+  const rows = result.rows;
+  console.log("Rows length:", rows.length);
+  if (!rows.length) {
+    els.statusEl.textContent = 'No data rows found.';
+    return;
+  }
+
+  // Debug: call buildFilters and log
+  buildFilters(rows);
+
+  // Determine Stage + Building ID from first row
+  const stage = rows[0].stage;
+  const building = rows[0].building;
 
   const rows = result.rows;
   if (!rows.length) {
