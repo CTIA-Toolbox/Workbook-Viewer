@@ -1,13 +1,6 @@
 
-import { readCorrelationSheet } from './correlationReader.js';
-import { buildCallKmlFromRows } from './kmlBuilder.js';
-import { downloadTextFile } from './utils.js';
 
-const fileInput = document.getElementById('fileInput');
-const fileInputLabel = document.getElementById('fileInputLabel');
-const exportBtn = document.getElementById('exportBtn');
-const statusEl = document.getElementById('status');
-const filterContainer = document.getElementById('filterContainer');
+
 
 
 async function handleExport() {
@@ -193,67 +186,8 @@ window.addEventListener('error', function(event) {
 window.addEventListener('unhandledrejection', function(event) {
   console.error('[GLOBAL PROMISE REJECTION]', event.reason);
 });
-console.log('REACHED 1: TOP OF FILE');
-import { readCorrelationSheet } from './correlationReader.js';
-import { buildCallKmlFromRows } from './kmlBuilder.js';     // adjust path if needed
-import { downloadTextFile } from './utils.js';              // adjust path if needed
-
-// DOM references
-const fileInput = document.getElementById('fileInput');
-const fileInputLabel = document.getElementById('fileInputLabel');
-const exportBtn = document.getElementById('exportBtn');
-const statusEl = document.getElementById('status');
-const filterContainer = document.getElementById('filterContainer');
-
-// Update file label
-fileInput.addEventListener('change', () => {
-  if (fileInput.files && fileInput.files.length > 0) {
-    fileInputLabel.textContent = fileInput.files[0].name;
-  } else {
-    fileInputLabel.textContent = 'No file chosen';
-  }
-});
-
-// Build dynamic filters
-function buildFilters(rows) {
-  filterContainer.innerHTML = '';
-
-  const filterableKeys = [
-    'path', 'point', 'completed', 'correlated', 'participant',
-    'os', 'source', 'phone', 'lat', 'lon', 'alt',
-    'validH', 'validV', 'chosen'
-  ];
-
-  for (const key of filterableKeys) {
-    const values = [...new Set(rows.map(r => r[key]).filter(v => v !== null && v !== undefined))];
-    if (values.length <= 1) continue;
-
-    const row = document.createElement('div');
-    row.className = 'filter-row';
-
-    const label = document.createElement('label');
-    label.textContent = key;
-
-    const select = document.createElement('select');
-    select.dataset.key = key;
-
-    const optAll = document.createElement('option');
-    optAll.value = '';
-    optAll.textContent = '(All)';
-    select.appendChild(optAll);
-
-    for (const v of values) {
-      const opt = document.createElement('option');
-      opt.value = v;
-      opt.textContent = v;
-      select.appendChild(opt);
-    }
-
-    row.appendChild(label);
-    row.appendChild(select);
-    filterContainer.appendChild(row);
-  }
-}
+// Removed duplicate import and DOM reference block at line 195-199
+// Removed orphaned duplicate 'values' declaration and code fragment
 
 // Export handler
 async function handleExport() {
@@ -804,9 +738,62 @@ try {
 }
 */
 
-console.log('REACHED 8: AFTER_STORAGE_STARTUP');
+// Removed duplicate import and DOM reference block at line 806-810
+// Removed orphaned duplicate 'values' declaration and code fragment
 
-// ...existing code...
+async function handleExport() {
+  statusEl.textContent = '';
+  const file = fileInput.files[0];
+  if (!file) {
+    statusEl.textContent = 'Please select an Excel workbook.';
+    return;
+  }
+  const result = await readCorrelationSheet(file);
+  if (!result.ok) {
+    statusEl.textContent = 'Error: ' + result.error;
+    return;
+  }
+  const rows = result.rows;
+  if (!rows.length) {
+    statusEl.textContent = 'No data rows found.';
+    return;
+  }
+  buildFilters(rows);
+  const stage = rows[0].stage;
+  const building = rows[0].building;
+  const selects = filterContainer.querySelectorAll('select');
+  const filtered = rows.filter(r => {
+    if (r.stage !== stage || r.building !== building) return false;
+    for (const sel of selects) {
+      const key = sel.dataset.key;
+      const val = sel.value;
+      if (val && String(r[key]) !== val) return false;
+    }
+    return true;
+  });
+  if (!filtered.length) {
+    statusEl.textContent = 'No matching rows after filtering.';
+    return;
+  }
+  const kml = buildCallKmlFromRows({
+    rows: filtered,
+    docName: `Correlation KML — ${building} (${filtered.length} points)`,
+    groupByParticipant: true
+  });
+  if (!kml) {
+    statusEl.textContent = 'KML generation failed.';
+    return;
+  }
+  const filename = `Correlation_${building}.kml`;
+  downloadTextFile({
+    filename,
+    text: kml,
+    mime: 'application/vnd.google-earth.kml+xml;charset=utf-8'
+  });
+  statusEl.textContent = `Exported: ${filename}`;
+}
+
+exportBtn.addEventListener('click', handleExport);
 
 try {
   setStatus('Ready. Load a Dataset (.pkl) to begin. Call data is optional.');
