@@ -1,3 +1,29 @@
+/* Filter container and filter row styles */
+.filter-container {
+  margin-top: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.filter-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.filter-row label {
+  font-size: 0.85em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.filter-row select {
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
 .egnyte-link-row {
   display: flex;
   flex-direction: column;

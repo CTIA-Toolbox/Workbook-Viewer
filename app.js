@@ -1,3 +1,45 @@
+// Build dynamic filters for all columns except Stage and Building ID
+function buildFilters(rows) {
+  const container = document.getElementById('filterContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const filterableKeys = [
+    'path', 'point', 'completed', 'correlated', 'participant',
+    'os', 'source', 'phone', 'lat', 'lon', 'alt',
+    'validH', 'validV', 'chosen'
+  ];
+
+  for (const key of filterableKeys) {
+    const values = [...new Set(rows.map(r => r[key]).filter(v => v !== null && v !== undefined))];
+    if (values.length <= 1) continue;
+
+    const row = document.createElement('div');
+    row.className = 'filter-row';
+
+    const label = document.createElement('label');
+    label.textContent = key;
+
+    const select = document.createElement('select');
+    select.dataset.key = key;
+
+    const optAll = document.createElement('option');
+    optAll.value = '';
+    optAll.textContent = '(All)';
+    select.appendChild(optAll);
+
+    for (const v of values) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      select.appendChild(opt);
+    }
+
+    row.appendChild(label);
+    row.appendChild(select);
+    container.appendChild(row);
+  }
+}
 import { readCorrelationSheet } from './correlationReader.js';
 // --- Color Palette ---
 const GRAY = 'FFD9D9D9';
@@ -3077,20 +3119,33 @@ async function handleExport() {
     return;
   }
 
+
   const rows = result.rows;
   if (!rows.length) {
     els.statusEl.textContent = 'No data rows found.';
     return;
   }
 
+  // Build dynamic filters before filtering
+  buildFilters(rows);
+
   // Determine Stage + Building ID from first row
   const stage = rows[0].stage;
   const building = rows[0].building;
 
-  const filtered = rows.filter(r =>
-    r.stage === stage &&
-    r.building === building
-  );
+  // Apply all selected filters
+  const filterContainer = document.getElementById('filterContainer');
+  const selects = filterContainer ? filterContainer.querySelectorAll('select') : [];
+
+  const filtered = rows.filter(r => {
+    if (r.stage !== stage || r.building !== building) return false;
+    for (const sel of selects) {
+      const key = sel.dataset.key;
+      const val = sel.value;
+      if (val && String(r[key]) !== val) return false;
+    }
+    return true;
+  });
 
   if (!filtered.length) {
     els.statusEl.textContent = 'No matching rows for Stage/Building.';
