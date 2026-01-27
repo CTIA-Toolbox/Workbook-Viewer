@@ -5,17 +5,14 @@
 // - This caches only local assets. Pyodide is loaded from a CDN and is not cached here.
 // - Extend later: add a user prompt, versioning strategy, and optional CDN caching.
 
-const CACHE_NAME = 'pkl-pivot-pwa-v65';
+const CACHE_NAME = 'workbook-viewer-v1';
 
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
-  './main.js',
   './correlationReader.js',
   './app.js',
-  './pyodide-loader.js',
-  './pivot.js',
   './manifest.json',
   './icons/icon.svg',
   './icons/maskable.svg',
