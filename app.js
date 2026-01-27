@@ -11,12 +11,34 @@ const exportBtn = document.getElementById('exportBtn');
 const statusEl = document.getElementById('status');
 const filterContainer = document.getElementById('filterContainer');
 
-fileInput.addEventListener('change', () => {
-	if (fileInput.files && fileInput.files.length > 0) {
-		fileInputLabel.textContent = fileInput.files[0].name;
-	} else {
+fileInput.addEventListener('change', async () => {
+	if (!fileInput.files || fileInput.files.length === 0) {
 		fileInputLabel.textContent = 'No file chosen';
+		return;
 	}
+
+	fileInputLabel.textContent = fileInput.files[0].name;
+	statusEl.textContent = 'Reading workbook…';
+
+	const result = await readCorrelationSheet(fileInput.files[0]);
+	if (!result.ok) {
+		statusEl.textContent = 'Error: ' + result.error;
+		return;
+	}
+
+	const rows = result.rows;
+	if (!rows.length) {
+		statusEl.textContent = 'No data rows found.';
+		return;
+	}
+
+	// Store rows globally for export
+	window._wv_rows = rows;
+
+	// Build filters immediately
+	buildFilters(rows);
+
+	statusEl.textContent = 'Filters ready.';
 });
 
 function buildFilters(rows) {
@@ -53,22 +75,13 @@ function buildFilters(rows) {
 
 async function handleExport() {
 	statusEl.textContent = '';
-	const file = fileInput.files[0];
-	if (!file) {
-		statusEl.textContent = 'Please select an Excel workbook.';
+
+	const rows = window._wv_rows;
+	if (!rows || !rows.length) {
+		statusEl.textContent = 'Please select a workbook first.';
 		return;
 	}
-	const result = await readCorrelationSheet(file);
-	if (!result.ok) {
-		statusEl.textContent = 'Error: ' + result.error;
-		return;
-	}
-	const rows = result.rows;
-	if (!rows.length) {
-		statusEl.textContent = 'No data rows found.';
-		return;
-	}
-	buildFilters(rows);
+
 	const stage = rows[0].stage;
 	const building = rows[0].building;
 	const selects = filterContainer.querySelectorAll('select');
