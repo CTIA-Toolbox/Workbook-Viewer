@@ -326,6 +326,11 @@ input[type="file"], input[type="text"], select {
 }
 .status-text { font-size: 14px; }
 .status-details summary { cursor: pointer; margin-top: 10px; color: var(--muted); }
+.status-line {
+  margin-top: 10px;
+  font-size: 0.9em;
+  color: #ff7a00;
+}
 .pre {
   margin: 10px 0 0;
   padding: 10px;
@@ -639,4 +644,31 @@ input[type="file"], input[type="text"], select {
   gap: 10px;
   padding: 12px 14px;
   border-top: 1px solid var(--border);
+}
+
+/* Make primary-btn look like file input button */
+.primary-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  margin-top: 12px;
+}
+.primary-btn:hover:not([disabled]) {
+  border-color: rgba(79,140,255,0.55);
+  box-shadow: 0 0 0 2px rgba(79,140,255,0.12) inset;
+  color: var(--accent);
+}
+.primary-btn:active:not([disabled]) {
+  background: var(--panel);
+}
+.primary-btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

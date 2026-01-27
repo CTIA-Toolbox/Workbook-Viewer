@@ -56,8 +56,7 @@ window.addEventListener('unhandledrejection', function(event) {
   console.error('[GLOBAL PROMISE REJECTION]', event.reason);
 });
 console.log('REACHED 1: TOP OF FILE');
-import { unpickleDataFrameToRecords } from './pyodide-loader.js';
-import { buildPivot, renderPivotGrid } from './pivot.js';
+// ...existing code...
 console.log('REACHED 2: AFTER IMPORTS');
 // --- Egnyte Modal Integration ---
 const egnyteLinks = [
@@ -167,85 +166,12 @@ console.log('REACHED 3: AFTER_EGNYTE_LISTENER_SETUP');
 console.log('REACHED 4: BEFORE_ELS_BLOCK');
 const els = {
   fileInput: document.getElementById('fileInput'),
-  callFileInput: document.getElementById('callFileInput'),
   statusText: document.getElementById('statusText'),
-  columnsPreview: document.getElementById('columnsPreview'),
-  gridContainer: document.getElementById('gridContainer'),
-  gridSummary: document.getElementById('gridSummary'),
-  zoomSelect: document.getElementById('zoomSelect'),
-  exportExcel: document.getElementById('exportExcel'),
-  lastDatasetInfo: document.getElementById('lastDatasetInfo'),
-  lastCallDatasetInfo: document.getElementById('lastCallDatasetInfo'),
-  filtersDetails: document.getElementById('filtersDetails'),
-  gridCard: document.getElementById('gridCard'),
-  callCard: document.getElementById('callCard'),
-  callSummary: document.getElementById('callSummary'),
-  callTableContainer: document.getElementById('callTableContainer'),
-  callLocationSourceBtn: document.getElementById('callLocationSourceBtn'),
-  callViewToggleBtn: document.getElementById('callViewToggleBtn'),
-  exportCallsExcel: document.getElementById('exportCallsExcel'),
-  exportCallsKml: document.getElementById('exportCallsKml'),
-  debugSection: document.getElementById('debugSection'),
   debugLog: document.getElementById('debugLog'),
-  filtersContainer: document.getElementById('filtersContainer'),
-  filtersHint: document.getElementById('filtersHint'),
-  clearFilters: document.getElementById('clearFilters'),
-
-  buildingSelect: document.getElementById('buildingSelect'),
-  selectAllBuildings: document.getElementById('selectAllBuildings'),
-  clearBuildings: document.getElementById('clearBuildings'),
-  buildingText: document.getElementById('buildingText'),
-  applyBuildingText: document.getElementById('applyBuildingText'),
-  clearBuildingText: document.getElementById('clearBuildingText'),
 };
 console.log('REACHED 5: AFTER_ELS_BLOCK');
 
-const state = {
-  columns: [],
-  records: [],
-  filteredRecords: [],
-
-  lastPivot: null,
-  lastRowHeaderCols: null,
-
-  metricCols: {
-    h80: null,
-    v80: null,
-  },
-
-  lastFileInfo: null,
-
-  dimCols: {
-    stage: null,
-    building: null,
-    participant: null,
-    path_id: null,
-    point_id: null,
-    os: null,
-    row_type: null,
-    id: null,
-  },
-
-  // Standard filters (empty = All). Building is required if present.
-  filters: {
-    participant: new Set(),
-    stage: new Set(),
-    building: new Set(),
-    path_id: new Set(),
-    point_id: new Set(),
-    os: new Set(),
-    row_type: new Set(),
-    location_source: new Set(),
-  },
-
-  // Per-section ID filters (Section value -> Set(ID values)).
-  // Only active when one or more Sections are explicitly selected.
-  idBySection: new Map(),
-
-  // Manual building override input support
-  knownBuildings: [],
-  knownBuildingsLowerMap: new Map(),
-};
+// ...state engine and filter logic removed...
 
 const callState = {
   columns: [],
@@ -585,24 +511,8 @@ function logDebug(message) {
   els.debugLog.textContent += (els.debugLog.textContent ? '\n' : '') + line;
 }
 
-// Visible startup confirmation (helps diagnose caching / module-load issues).
-setStatus('Ready. Load a Dataset (.pkl) to begin. Call data is optional.');
+setStatus('Ready. Load a Dataset to begin.');
 logDebug('app.js initialized.');
-
-// No previous-session restore: clear any legacy saved blobs and hide the info rows.
-console.log('REACHED 7: BEFORE_CLEAR_PKLS_IIFE');
-
-(async () => {
-  try {
-    if (els.lastDatasetInfo) els.lastDatasetInfo.textContent = '';
-    if (els.lastCallDatasetInfo) els.lastCallDatasetInfo.textContent = '';
-    await idbDeletePkl(IDB_KEY_ARCHIVE_PKL);
-    await idbDeletePkl(IDB_KEY_CALL_PKL);
-    logDebug('Cleared any previously saved PKLs (previous-session restore disabled).');
-  } catch {
-    // ignore
-  }
-})();
 
 
 
@@ -3149,63 +3059,21 @@ if (els.clearBuildings && els.buildingSelect) {
 
 
 
-// File input events — attach in a function and call on DOMContentLoaded as well
-// ...existing code...
+// File input events — minimal version
 function attachFileInputListeners() {
-  console.log('[DIAG] attachFileInputListeners called');
-  if (!els.fileInput) {
-    console.log('[DIAG] attachFileInputListeners: els.fileInput is missing, returning early');
-    setStatus('App initialization: file input not found in DOM yet. Will retry on DOMContentLoaded.');
-    logDebug('Notice: #fileInput not found yet; delaying listener attachment.');
-    return;
-  }
-
-  console.log('[app] attaching fileInput listeners, element=', els.fileInput);
-  console.log('REACHED FILE INPUT HANDLER SETUP');
-  if (els.fileInput.__listenersAttached) {
-    console.log('[DIAG] attachFileInputListeners: listeners already attached, returning early');
-    return;
-  }
-
+  if (!els.fileInput) return;
   els.fileInput.addEventListener('click', () => {
-    console.log('[app] fileInput clicked');
-    if (els.debugLog) els.debugLog.textContent += `\n[app] fileInput clicked`;
-    try { els.fileInput.value = ''; } catch (e) { console.warn(e); }
+    try { els.fileInput.value = ''; } catch (e) {}
   });
-
-  const fileChangeHandler = (ev) => {
-    try {
-      console.log('[app] fileInput change/input event fired', ev);
-      if (els.debugLog) els.debugLog.textContent += `\n[app] fileInput change/input event fired`;
-      const file = els.fileInput.files?.[0];
-      if (!file) {
-        console.log('[app] No file selected in fileInput change event.');
-        if (els.debugLog) els.debugLog.textContent += `\n[app] No file selected in fileInput change event.`;
-        return;
-      }
-      console.log('[app] file selected:', file.name, file.size, file.type);
-      if (els.debugLog) els.debugLog.textContent += `\n[app] file selected: ${file.name} (${file.size} bytes)`;
-      onFileSelected(file);
-    } catch (err) {
-      console.error('[app] error in fileChangeHandler', err);
-      if (els.debugLog) els.debugLog.textContent += `\n[app] error in fileChangeHandler: ${err?.message ?? err}`;
-    }
-  };
-
-  console.log('REACHED FILE INPUT HANDLER SETUP');
   els.fileInput.addEventListener('change', function(event) {
-    console.log('FILE INPUT CHANGED', event.target.files);
-    return fileChangeHandler(event);
+    const file = els.fileInput.files?.[0];
+    if (!file) return;
+    // Placeholder: handle file for KML generation
+    setStatus('File selected: ' + file.name);
+    logDebug('File selected: ' + file.name);
+    // TODO: Implement KML generation logic here
   });
-  els.fileInput.addEventListener('input', function(event) {
-    console.log('FILE INPUT CHANGED', event.target.files);
-    return fileChangeHandler(event);
-  });
-  els.fileInput.__listenersAttached = true;
 }
-
-// Try to attach immediately, and also on DOMContentLoaded in case elements were not ready
-console.log('REACHED 8: BEFORE_ATTACH_FILE_INPUT_LISTENERS_CALL');
 attachFileInputListeners();
 window.addEventListener('DOMContentLoaded', () => attachFileInputListeners());
 
