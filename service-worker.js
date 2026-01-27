@@ -11,6 +11,8 @@ const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
+  './main.js',
+  './correlationReader.js',
   './app.js',
   './pyodide-loader.js',
   './pivot.js',

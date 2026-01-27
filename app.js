@@ -1946,8 +1946,7 @@ function updateSectionsVisibility() {
   toggle(els.debugSection, showDebug);
 }
 
-// Initial visibility (no data yet).
-updateSectionsVisibility();
+// ...removed call to updateSectionsVisibility(); no longer needed in minimal PWA...
 
 function syncBuildingSelectFromState() {
   if (!els.buildingSelect) return;
