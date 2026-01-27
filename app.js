@@ -9,46 +9,6 @@ const exportBtn = document.getElementById('exportBtn');
 const statusEl = document.getElementById('status');
 const filterContainer = document.getElementById('filterContainer');
 
-// Update file label on file selection
-fileInput.addEventListener('change', () => {
-  if (fileInput.files && fileInput.files.length > 0) {
-    fileInputLabel.textContent = fileInput.files[0].name;
-  } else {
-    fileInputLabel.textContent = 'No file chosen';
-  }
-});
-
-function buildFilters(rows) {
-  filterContainer.innerHTML = '';
-  const filterableKeys = [
-    'path', 'point', 'completed', 'correlated', 'participant',
-    'os', 'source', 'phone', 'lat', 'lon', 'alt',
-    'validH', 'validV', 'chosen'
-  ];
-  for (const key of filterableKeys) {
-    const values = [...new Set(rows.map(r => r[key]).filter(v => v !== null && v !== undefined))];
-    if (values.length <= 1) continue;
-    const row = document.createElement('div');
-    row.className = 'filter-row';
-    const label = document.createElement('label');
-    label.textContent = key;
-    const select = document.createElement('select');
-    select.dataset.key = key;
-    const optAll = document.createElement('option');
-    optAll.value = '';
-    optAll.textContent = '(All)';
-    select.appendChild(optAll);
-    for (const v of values) {
-      const opt = document.createElement('option');
-      opt.value = v;
-      opt.textContent = v;
-      select.appendChild(opt);
-    }
-    row.appendChild(label);
-    row.appendChild(select);
-    filterContainer.appendChild(row);
-  }
-}
 
 async function handleExport() {
   statusEl.textContent = '';
