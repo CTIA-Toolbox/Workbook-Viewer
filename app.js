@@ -2,6 +2,9 @@ import { readCorrelationSheet } from './correlationReader.js';
 import { buildCallKmlFromRows } from './kmlBuilder.js';
 import { downloadTextFile } from './utils.js';
 
+console.log("Workbook Viewer app.js loaded");
+
+
 const fileInput = document.getElementById('fileInput');
 const fileInputLabel = document.getElementById('fileInputLabel');
 const exportBtn = document.getElementById('exportBtn');
