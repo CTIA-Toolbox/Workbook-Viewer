@@ -11,37 +11,48 @@
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="./styles.css?v=36" />
 
-
- 
-
-  <!-- Excel export (styled XLSX). Loaded from CDN. -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 </head>
 <body>
 
+  <div id="egnyteModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+      <button id="egnyteModalClose" class="modal-close" title="Close">&times;</button>
+      <h2 class="modal-title">Egnyte Folder Access</h2>
+      <div id="egnyteModalContent">Loading…</div>
+    </div>
+  </div>
+
   <header class="app-header">
     <div class="app-title">
       <h1>Workbook Viewer</h1>
-      <p style="font-size:13px;color:var(--muted);margin:2px 0 0;"></p>
+      <p id="statusText" style="font-size:13px;color:var(--muted);margin:2px 0 0;"></p>
     </div>
   </header>
 
   <main class="app-main">
     <section class="grid-card">
-      <label class="file">
-        <span class="label">Select a file to convert</span>
-        <div class="file-row">
+      <div class="file-group" style="padding: 16px;">
+        <span class="label">Step 1: Select a file to convert</span>
+        <div class="file-row" style="margin-top: 8px;">
+          <span id="fileInputLabel" class="muted small" style="display:block; margin-bottom:8px;">No file chosen</span>
           <input id="fileInput" type="file" accept=".xlsx,.xls" style="margin-bottom:12px;">
-          <span id="fileInputLabel" class="file-label">No file chosen</span>
         </div>
-      </label>
-
-      <!-- Filters must be OUTSIDE the label -->
-      <div id="filterContainer" class="filter-container"></div>
-      <div class="button-row">
-        <button id="exportBtn" class="primary-btn" style="margin-top:12px;">Generate KML</button>
-        <div id="status" class="status-line"></div>
       </div>
+
+      <div id="filterContainer" class="filter-container" style="padding: 0 16px;"></div>
+      
+      <div class="button-row" style="padding: 16px; border-top: 1px solid var(--border); margin-top: 12px;">
+        <button id="exportBtn" class="primary-btn btn" style="width: 100%;">Generate KML</button>
+        <div id="status" class="status-line muted small" style="margin-top:12px; min-height: 1.2em;"></div>
+      </div>
+    </section>
+
+    <section class="status-details" style="margin-top: 20px; padding: 0 16px;">
+      <details>
+        <summary class="muted small" style="cursor:pointer;">Advanced Debug Log</summary>
+        <pre id="debugLog" class="pre" style="margin-top:10px; background:var(--panel-2); color:var(--muted); border:1px solid var(--border); padding:10px; font-size:11px; max-height:150px; overflow:auto;"></pre>
+      </details>
     </section>
   </main>
 
@@ -49,49 +60,12 @@
     <strong id="buildStamp">dev-27</strong>
   </footer>
 
+  <script type="module" src="./app.js"></script>
 
-<!-- Load the app module with a visible error fallback (so failures aren't silent). -->
-<script type="module" src="./app.js"></script>
+  <script>
+    const logEl = document.getElementById('debugLog');
+    const statusTextEl = document.getElementById('statusText');
 
-<!-- Inline error logging + global handlers -->
-<script>
-  const logEl = document.getElementById('debugLog');
-  const statusEl = document.getElementById('statusText');
-
-  const log = (msg) => {
-    if (!logEl) return;
-    const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    logEl.textContent += (logEl.textContent ? "\n" : "") + line;
-  };
-
-  window.addEventListener('error', function(e) {
-    alert('A JavaScript error occurred: ' + e.message + '\n' + (e.filename || '') + ':' + (e.lineno || ''));
-    log('Global error: ' + e.message + ' at ' + (e.filename || '') + ':' + (e.lineno || ''));
-  });
-
-  window.addEventListener('unhandledrejection', function(e) {
-    alert('A JavaScript promise error occurred: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
-    log('Global promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
-  });
-
-  log('Bootstrapping app module…');
-</script>
-
-
-
-<!-- Service worker registration -->
-<script>
-  // Basic SW registration for the app shell.
-  // (Service worker doesn't cache Pyodide CDN assets by default.)
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js').then((reg) => {
-        // Encourage quick updates while iterating.
-        reg.update().catch(() => {});
-      }).catch(() => {});
-    });
-  }
-</script>
-
-</body>
-</html>
+    const log = (msg) => {
+      if (!logEl) return;
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;}
