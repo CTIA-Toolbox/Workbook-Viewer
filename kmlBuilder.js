@@ -1,14 +1,17 @@
 // kmlBuilder.js
 export function buildCallKmlFromRows({ rows, testPoints, docName, groupByParticipant = true }) {
-  if (!rows || !rows.length) return null;
+  if (!rows || !rows.length || !testPoints) return null;
 
-  // Constants from your logic
-  const STYLE_OK = 'lineOk';
-  const STYLE_BAD = 'lineBad';
-  const OK_VERT_M = 5;
-  const OK_HORIZ_M = 50;
+  const pieces = [];
+  pieces.push('<?xml version="1.0" encoding="UTF-8"?>');
+  pieces.push('<kml xmlns="http://www.opengis.net/kml/2.2">');
+  pieces.push('<Document>');
+  pieces.push(`<name>${xmlEscape(docName)}</name>`);
 
-  // Haversine Math (Stolen from your provided logic)
+  // Define Styles: Green for Pass, Red for Fail
+  pieces.push('<Style id="lineOk"><LineStyle><color>ff00ff00</color><width>2</width></LineStyle></Style>');
+  pieces.push('<Style id="lineBad"><LineStyle><color>ff0000ff</color><width>2</width></LineStyle></Style>');
+
   const haversineMeters = (lat1, lon1, lat2, lon2) => {
     const toRad = (deg) => (deg * Math.PI) / 180;
     const R = 6371000;
@@ -19,77 +22,71 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
     return R * cVal;
   };
 
-  const pieces = [];
-  pieces.push('<?xml version="1.0" encoding="UTF-8"?>');
-  pieces.push('<kml xmlns="http://www.opengis.net/kml/2.2">');
-  pieces.push('<Document>');
-  pieces.push(`<name>${xmlEscape(docName)}</name>`);
+  // Grouping logic for the Folder structure
+  const groups = {};
 
-  // Styles (ABGR format)
-  pieces.push('<Style id="lineOk"><LineStyle><color>ff00ff00</color><width>2</width></LineStyle></Style>');
-  pieces.push('<Style id="lineBad"><LineStyle><color>ff0000ff</color><width>2</width></LineStyle></Style>');
-
-  // Grouping Logic (Simplified for your new tool's structure)
-  let groups = {};
   for (const r of rows) {
-    const key = groupByParticipant ? (r.participant || "Unknown") : "All Vectors";
-    if (!groups[key]) groups[key] = [];
+    const pointId = String(r.point || "").trim();
+    const orig = testPoints[pointId];
     
-    // --- DATA MAPPING ---
-    const id = String(r.point || "");
-    const orig = testPoints[id];
-    
-    if (!orig) continue; // Skip if no origin found in lookup
+    // Skip if we don't have a ground truth point to draw a vector FROM
+    if (!orig) continue;
 
-    const actualLat = Number(orig.lat);
-    const actualLon = Number(orig.lon);
-    const actualAlt = Number(orig.alt) || 0;
+    // 1. Origin Coordinates (from TestPoints.xlsx)
+    const lat1 = Number(orig.lat);
+    const lon1 = Number(orig.lon);
+    const alt1 = Number(orig.alt) || 0;
 
-    const locLat = Number(r.lat);
-    const locLon = Number(r.lon);
-    const locAlt = Number(r.alt) || actualAlt; // Fallback to origin altitude
+    // 2. Reported Coordinates (from uploaded Workbook)
+    const lat2 = Number(r.lat);
+    const lon2 = Number(r.lon);
+    const alt2 = Number(r.alt) || alt1; // Fallback to origin alt if missing
 
-    // Math
-    const delta = locAlt - actualAlt;
-    const horizM = haversineMeters(actualLat, actualLon, locLat, locLon);
-    const vertM = Math.abs(delta);
-    const isOk = (vertM < OK_VERT_M) && (horizM < OK_HORIZ_M);
-    const styleUrl = isOk ? `#${STYLE_OK}` : `#${STYLE_BAD}`;
+    // 3. Vector Math
+    const horizM = haversineMeters(lat1, lon1, lat2, lon2);
+    const vertM = Math.abs(alt2 - alt1);
+    const isOk = (horizM < 50) && (vertM < 5); // 50m Horiz / 5m Vert thresholds
+    const styleUrl = isOk ? '#lineOk' : '#lineBad';
 
-    const placemarkName = `${id} • ${r.participant || 'User'}`;
-    
+    // 4. Grouping
+    const folderName = groupByParticipant ? (r.participant || "Unknown") : "Vectors";
+    if (!groups[folderName]) groups[folderName] = [];
+
     const desc = [
-      `Point ID: ${id}`,
-      `Participant: ${r.participant || 'N/A'}`,
-      `Horizontal Distance: ${horizM.toFixed(2)}m`,
-      `Vertical Distance: ${vertM.toFixed(2)}m`,
-      `Result: ${isOk ? 'PASS' : 'FAIL'}`
+      `<b>Point ID:</b> ${pointId}`,
+      `<b>Participant:</b> ${r.participant || 'N/A'}`,
+      `<b>Path:</b> ${r.path || 'N/A'}`,
+      `<hr>`,
+      `<b>Horizontal Shift:</b> ${horizM.toFixed(2)}m`,
+      `<b>Vertical Shift:</b> ${vertM.toFixed(2)}m`,
+      `<b>Status:</b> ${isOk ? 'PASS' : 'FAIL'}`
     ].join('<br/>');
 
     const pm = `
     <Placemark>
-      <name>${xmlEscape(placemarkName)}</name>
+      <name>${xmlEscape(pointId)} Vector</name>
       <styleUrl>${styleUrl}</styleUrl>
       <description><![CDATA[${desc}]]></description>
       <LineString>
-        <tessellate>1</tessellate>
         <altitudeMode>absolute</altitudeMode>
-        <coordinates>${actualLon},${actualLat},${actualAlt} ${locLon},${locLat},${locAlt}</coordinates>
+        <coordinates>${lon1},${lat1},${alt1} ${lon2},${lat2},${alt2}</coordinates>
       </LineString>
     </Placemark>`;
-    
-    groups[key].push(pm);
+
+    groups[folderName].push(pm);
   }
 
-  // Build Folder Structure
-  for (const [groupName, placemarks] of Object.entries(groups)) {
-    pieces.push('<Folder>');
-    pieces.push(`<name>${xmlEscape(groupName)} (${placemarks.length})</name>`);
+  // Generate Folders
+  for (const [folderName, placemarks] of Object.entries(groups)) {
+    pieces.push('  <Folder>');
+    pieces.push(`    <name>${xmlEscape(folderName)} (${placemarks.length})</name>`);
     pieces.push(...placemarks);
-    pieces.push('</Folder>');
+    pieces.push('  </Folder>');
   }
 
-  pieces.push('</Document></kml>');
+  pieces.push('</Document>');
+  pieces.push('</kml>');
+
   return pieces.join('\n');
 }
 
