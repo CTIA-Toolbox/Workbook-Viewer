@@ -36,7 +36,10 @@ export async function loadTestPoints() {
       };
     }
 
-    console.log(`Loaded ${Object.keys(lookup).length} test points from lookup.`);
+    const loadedIds = Object.keys(lookup);
+    console.log(`Loaded ${loadedIds.length} test points from lookup.`);
+    console.log("Sample test point IDs:", loadedIds.slice(0, 10));
+    console.log("Sample test point data:", lookup[loadedIds[0]]);
     return lookup;
 
   } catch (err) {

@@ -81,6 +81,11 @@ export async function readCorrelationSheet(file) {
       outRows.push(obj);
     }
 
+    // Log sample point IDs from the correlation sheet
+    const samplePoints = outRows.slice(0, 10).map(r => r.point).filter(p => p != null);
+    console.log(`Loaded ${outRows.length} rows from Correlation sheet.`);
+    console.log("Sample Point IDs from workbook:", samplePoints);
+
     return { ok: true, rows: outRows };
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) };
