@@ -42,6 +42,17 @@ export async function readCorrelationSheet(file) {
       ['Location Altitude (Geoid)', 'altGeoid'], // Needed for the delta math
       ['Location Source', 'source']
     ];
+    
+    // Optional fields for pass/fail logic (won't cause error if missing)
+    const optionalHeaders = [
+      ['Completed Call', 'completed'],
+      ['Correlated Call', 'correlated'],
+      ['Valid Horizontal Location', 'validH'],
+      ['Valid Vertical Location', 'validV'],
+      ['Chosen Location', 'chosen'],
+      ['Handset OS', 'os'],
+      ['Location Phone Number', 'phone']
+    ];
 
     const colIndexes = {};
     const missing = [];
@@ -58,6 +69,14 @@ export async function readCorrelationSheet(file) {
         colIndexes[key] = idx;
       }
     }
+    
+    // Now check for optional headers (won't error if missing)
+    for (const [header, key] of optionalHeaders) {
+      const idx = headerRow.indexOf(header);
+      if (idx !== -1) {
+        colIndexes[key] = idx;
+      }
+    }
 
     if (missing.length) {
       return { ok: false, error: 'Missing required headers: ' + missing.join(', ') };
@@ -69,7 +88,9 @@ export async function readCorrelationSheet(file) {
       if (!Array.isArray(row) || row.length === 0) continue;
       
       const obj = {};
-      for (const [header, key] of requiredHeaders) {
+      // Map all headers (required + optional)
+      const allHeaders = [...requiredHeaders, ...optionalHeaders];
+      for (const [header, key] of allHeaders) {
         const idx = colIndexes[key];
         // Only map if the index was found
         if (idx !== undefined) {

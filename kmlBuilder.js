@@ -15,6 +15,8 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
   const groups = {};
   let skippedCount = 0;
   let matchedCount = 0;
+  let passCount = 0;
+  let failCount = 0;
   const missingPoints = new Set();
 
   for (const r of rows) {
@@ -41,11 +43,20 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
     const folderName = groupByParticipant ? String(r.participant || "Unknown").trim() : "Vectors";
     if (!groups[folderName]) groups[folderName] = [];
 
+    // Determine pass/fail - a point fails if validH or validV is explicitly "No" or false
+    const validH = String(r.validH || "").toLowerCase();
+    const validV = String(r.validV || "").toLowerCase();
+    const isPassing = validH !== "no" && validH !== "false" && validV !== "no" && validV !== "false";
+    const styleUrl = isPassing ? "#lineOk" : "#lineBad";
+    
+    if (isPassing) passCount++;
+    else failCount++;
+
     // Build the Placemark as a single clean string
     const pm = [
       '    <Placemark>',
       `      <name>${xmlEscape("Pt " + pointId)}</name>`,
-      '      <styleUrl>#lineOk</styleUrl>',
+      `      <styleUrl>${styleUrl}</styleUrl>`,
       '      <LineString>',
       '        <tessellate>1</tessellate>',
       '        <altitudeMode>relativeToGround</altitudeMode>',
@@ -70,6 +81,8 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
 
   const finalKml = pieces.join('\n');
   console.log("=== KML GENERATION SUMMARY ===");
+  console.log(`Passing (green): ${passCount}`);
+  console.log(`Failing (red): ${failCount}`);
   console.log(`Total rows processed: ${rows.length}`);
   console.log(`Matched test points: ${matchedCount}`);
   console.log(`Skipped (no match): ${skippedCount}`);
