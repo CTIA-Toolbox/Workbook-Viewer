@@ -31,26 +31,41 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
 
     const lat1 = Number(orig.lat);
     const lon1 = Number(orig.lon);
-    const alt1 = Number(orig.alt) || 0;
+    const alt1 = Number(orig.alt) || 0; // Test point already uses HAE
 
     const lat2 = Number(r.lat);
     const lon2 = Number(r.lon);
-    const alt2 = Number(r.alt) || 0;
+    // Use HAE if available, otherwise fall back to alt
+    const alt2 = Number(r.altHae) || Number(r.alt) || 0;
 
     // Safety check for valid coordinates
     if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) continue;
 
-    const folderName = groupByParticipant ? String(r.participant || "Unknown").trim() : "Vectors";
-    if (!groups[folderName]) groups[folderName] = [];
-
-    // Determine pass/fail - a point fails if validH or validV is explicitly "No" or false
-    const validH = String(r.validH || "").toLowerCase();
-    const validV = String(r.validV || "").toLowerCase();
-    const isPassing = validH !== "no" && validH !== "false" && validV !== "no" && validV !== "false";
+    // Calculate horizontal distance in meters using Haversine formula
+    const R = 6371000; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const horizontalError = R * c;
+    
+    // Calculate vertical error in meters
+    const verticalError = Math.abs(alt2 - alt1);
+    
+    // Determine pass/fail based on thresholds
+    const isPassing = horizontalError <= 50 && verticalError <= 5;
     const styleUrl = isPassing ? "#lineOk" : "#lineBad";
     
     if (isPassing) passCount++;
     else failCount++;
+
+    const folderName = groupByParticipant ? String(r.participant || "Unknown").trim() : "Vectors";
+    if (!groups[folderName]) groups[folderName] = [];
 
     // Build the Placemark as a single clean string
     const pm = [
@@ -59,7 +74,8 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
       `      <styleUrl>${styleUrl}</styleUrl>`,
       '      <LineString>',
       '        <tessellate>1</tessellate>',
-      '        <altitudeMode>relativeToGround</altitudeMode>',
+      '        <altitudeMode>absolute</altitudeMode>',
+      '        <extrude>0</extrude>',
       `        <coordinates>${lon1},${lat1},${alt1} ${lon2},${lat2},${alt2}</coordinates>`,
       '      </LineString>',
       '    </Placemark>'
