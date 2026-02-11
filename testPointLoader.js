@@ -1,10 +1,9 @@
 // testPointLoader.js
 // Loads TestPoints.xlsx and builds a lookup table keyed by Test Point ID.
 
-import * as XLSX from "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js";
-
 export async function loadTestPoints() {
   try {
+    // Fetch from your repo (cache: 'no-store' ensures you get the latest version)
     const resp = await fetch('./TestPoints.xlsx', { cache: 'no-store' });
 
     if (!resp.ok) {
@@ -13,16 +12,19 @@ export async function loadTestPoints() {
     }
 
     const arrayBuffer = await resp.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    
+    // Note: We use window.XLSX because it's loaded via CDN in your HTML
+    const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
 
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(sheet);
+    const rows = window.XLSX.utils.sheet_to_json(sheet);
 
     const lookup = {};
 
     for (const r of rows) {
-      const id = r["Test Point ID"];
+      // Force ID to string to avoid "101" !== 101 mismatch issues
+      const id = r["Test Point ID"] ? String(r["Test Point ID"]).trim() : null;
       if (!id) continue;
 
       lookup[id] = {
@@ -34,7 +36,7 @@ export async function loadTestPoints() {
       };
     }
 
-    console.log("Loaded test point lookup:", lookup);
+    console.log(`Loaded ${Object.keys(lookup).length} test points from lookup.`);
     return lookup;
 
   } catch (err) {

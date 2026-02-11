@@ -1,11 +1,5 @@
 // correlationReader.js
-// Reads and cleans the 'Correlation' sheet from an uploaded Excel workbook using XLSX
 
-/**
- * Reads the 'Correlation' sheet from an Excel workbook and extracts required columns.
- * @param {ArrayBuffer|File} file - The uploaded Excel file (ArrayBuffer or File)
- * @returns {Promise<{ok: true, rows: Array<Object>} | {ok: false, error: string}>}
- */
 export async function readCorrelationSheet(file) {
   try {
     let data;
@@ -17,7 +11,6 @@ export async function readCorrelationSheet(file) {
       return { ok: false, error: 'Input must be an ArrayBuffer or File.' };
     }
 
-    // XLSX must be loaded globally (from CDN)
     const XLSX = window.XLSX;
     if (!XLSX) return { ok: false, error: 'XLSX library not loaded.' };
 
@@ -34,59 +27,62 @@ export async function readCorrelationSheet(file) {
 
     // Header row is at index 2 (Excel row 3)
     const headerRow = rows[2];
-    if (!Array.isArray(headerRow)) {
-      return { ok: false, error: 'Header row (index 2) is missing or invalid.' };
-    }
 
-    // Required headers and their output keys
+    // UPDATED: Added HAE and Geoid headers to support your "Gold Standard" KML math
     const requiredHeaders = [
       ['Stage', 'stage'],
       ['Building ID', 'building'],
       ['Path ID', 'path'],
       ['Point ID', 'point'],
-      ['Completed Call', 'completed'],
-      ['Correlated Call', 'correlated'],
       ['Participant', 'participant'],
-      ['Handset OS', 'os'],
-      ['Location Source', 'source'],
-      ['Location Phone Number', 'phone'],
       ['Location Latitude', 'lat'],
       ['Location Longitude', 'lon'],
-      ['Location Altitude', 'alt'],
-      ['Valid Horizontal Location', 'validH'],
-      ['Valid Vertical Location', 'validV'],
-      ['Chosen Location', 'chosen']
+      ['Location Altitude', 'alt'], // Default/MSL
+      ['Location Altitude (HAE)', 'altHae'], // Needed for the delta math
+      ['Location Altitude (Geoid)', 'altGeoid'], // Needed for the delta math
+      ['Location Source', 'source']
     ];
 
-    // Map header names to column indexes
     const colIndexes = {};
     const missing = [];
+    
     for (const [header, key] of requiredHeaders) {
       const idx = headerRow.indexOf(header);
       if (idx === -1) {
-        missing.push(header);
+        // We'll treat altitude subtypes as optional so the script doesn't crash 
+        // if the specific workbook doesn't have HAE columns.
+        if (key !== 'altHae' && key !== 'altGeoid') {
+          missing.push(header);
+        }
       } else {
         colIndexes[key] = idx;
       }
     }
+
     if (missing.length) {
       return { ok: false, error: 'Missing required headers: ' + missing.join(', ') };
     }
 
-    // Extract data rows (starting at index 3)
     const outRows = [];
     for (let i = 3; i < rows.length; ++i) {
       const row = rows[i];
-      if (!Array.isArray(row)) continue;
+      if (!Array.isArray(row) || row.length === 0) continue;
+      
       const obj = {};
       for (const [header, key] of requiredHeaders) {
-        obj[key] = row[colIndexes[key]];
+        const idx = colIndexes[key];
+        // Only map if the index was found
+        if (idx !== undefined) {
+          obj[key] = row[idx];
+        } else {
+          obj[key] = null;
+        }
       }
       outRows.push(obj);
     }
 
     return { ok: true, rows: outRows };
   } catch (err) {
-    return { ok: false, error: err && err.message ? err.message : String(err) };
+    return { ok: false, error: err?.message ?? String(err) };
   }
 }
