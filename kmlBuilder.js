@@ -1,4 +1,10 @@
 // kmlBuilder.js
+
+// Geoid offset adjustment for Google Earth display
+// In many parts of the US, HAE is ~30-34 meters above MSL.
+// Adjust this number until vectors "dock" correctly to your building floors.
+const GEOID_OFFSET = 32; // meters to subtract from HAE
+
 export function buildCallKmlFromRows({ rows, testPoints, docName, groupByParticipant = true }) {
   if (!rows || !rows.length || !testPoints) return null;
 
@@ -31,12 +37,15 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
 
     const lat1 = Number(orig.lat);
     const lon1 = Number(orig.lon);
-    const alt1 = Number(orig.alt) || 0; // Test point already uses HAE
+    const alt1Hae = Number(orig.alt) || 0; // Test point uses HAE/ellipsoid
 
     const lat2 = Number(r.lat);
     const lon2 = Number(r.lon);
-    // Use HAE for both calculation and display (test points are also HAE/ellipsoid)
-    const alt2 = Number(r.altHae) || Number(r.alt) || 0;
+    const alt2Hae = Number(r.altHae) || Number(r.alt) || 0;
+    
+    // Convert HAE to Google Earth Absolute mode (MSL-ish) for display
+    const alt1Final = alt1Hae - GEOID_OFFSET;
+    const alt2Final = alt2Hae - GEOID_OFFSET;
 
     // Safety check for valid coordinates
     if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) continue;
@@ -54,8 +63,8 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     const horizontalError = R * c;
     
-    // Calculate vertical error in meters
-    const verticalError = Math.abs(alt2 - alt1);
+    // Calculate vertical error in meters (ellipsoid to ellipsoid comparison)
+    const verticalError = Math.abs(alt2Hae - alt1Hae);
     
     // Determine pass/fail based on thresholds
     const isPassing = horizontalError <= 50 && verticalError <= 5;
@@ -81,7 +90,7 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
       '      <LineString>',
       '        <tessellate>1</tessellate>',
       '        <altitudeMode>absolute</altitudeMode>',
-      `        <coordinates>${lon1},${lat1},${alt1} ${lon2},${lat2},${alt2}</coordinates>`,
+      `        <coordinates>${lon1},${lat1},${alt1Final} ${lon2},${lat2},${alt2Final}</coordinates>`,
       '      </LineString>',
       '    </Placemark>'
     ].join('\n');
