@@ -82,9 +82,8 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
       `      <styleUrl>${styleUrl}</styleUrl>`,
       '      <LineString>',
       '        <tessellate>1</tessellate>',
-      '        <altitudeMode>absolute</altitudeMode>',
-      '        <extrude>0</extrude>',
-      `        <coordinates>${lon1},${lat1},${alt1} ${lon2},${lat2},${alt2Display}</coordinates>`,
+      '        <altitudeMode>clampToGround</altitudeMode>',
+      `        <coordinates>${lon1},${lat1},0 ${lon2},${lat2},0</coordinates>`,
       '      </LineString>',
       '    </Placemark>'
     ].join('\n');
