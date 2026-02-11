@@ -1,10 +1,5 @@
 // kmlBuilder.js
 
-// Geoid offset adjustment for Google Earth display
-// In many parts of the US, HAE is ~30-34 meters above MSL.
-// Adjust this number until vectors "dock" correctly to your building floors.
-const GEOID_OFFSET = 32; // meters to subtract from HAE
-
 export function buildCallKmlFromRows({ rows, testPoints, docName, groupByParticipant = true }) {
   if (!rows || !rows.length || !testPoints) return null;
 
@@ -41,11 +36,15 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
 
     const lat2 = Number(r.lat);
     const lon2 = Number(r.lon);
-    const alt2Hae = Number(r.altHae) || Number(r.alt) || 0;
     
-    // Convert HAE to Google Earth Absolute mode (MSL-ish) for display
-    const alt1Final = alt1Hae - GEOID_OFFSET;
-    const alt2Final = alt2Hae - GEOID_OFFSET;
+    // Calculate geoid separation from available data (HAE - Geoid)
+    const alt2Hae = Number(r.altHae) || Number(r.alt) || 0;
+    const alt2Geoid = Number(r.altGeoid) || null;
+    const geoidSep = (alt2Hae && alt2Geoid !== null) ? (alt2Hae - alt2Geoid) : null;
+    
+    // For Google Earth display: prefer Geoid altitude, otherwise convert HAE using separation
+    const alt1Display = geoidSep !== null ? (alt1Hae - geoidSep) : alt1Hae;
+    const alt2Display = alt2Geoid !== null ? alt2Geoid : (geoidSep !== null ? (alt2Hae - geoidSep) : alt2Hae);
 
     // Safety check for valid coordinates
     if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) continue;
@@ -63,7 +62,7 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     const horizontalError = R * c;
     
-    // Calculate vertical error in meters (ellipsoid to ellipsoid comparison)
+    // Calculate vertical error in meters (ellipsoid to ellipsoid comparison for accuracy)
     const verticalError = Math.abs(alt2Hae - alt1Hae);
     
     // Determine pass/fail based on thresholds
@@ -90,7 +89,7 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
       '      <LineString>',
       '        <tessellate>1</tessellate>',
       '        <altitudeMode>absolute</altitudeMode>',
-      `        <coordinates>${lon1},${lat1},${alt1Final} ${lon2},${lat2},${alt2Final}</coordinates>`,
+      `        <coordinates>${lon1},${lat1},${alt1Display} ${lon2},${lat2},${alt2Display}</coordinates>`,
       '      </LineString>',
       '    </Placemark>'
     ].join('\n');
