@@ -51,7 +51,9 @@ export async function readCorrelationSheet(file) {
       ['Valid Vertical Location', 'validV'],
       ['Chosen Location', 'chosen'],
       ['Handset OS', 'os'],
-      ['Location Phone Number', 'phone']
+      ['Location Phone Number', 'phone'],
+      ['Location Timestamp', 'timestamp'],
+      ['Location Time', 'timestamp'] // Alternative name for timestamp
     ];
 
     const colIndexes = {};

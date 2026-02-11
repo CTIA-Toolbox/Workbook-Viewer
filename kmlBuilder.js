@@ -35,8 +35,10 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
 
     const lat2 = Number(r.lat);
     const lon2 = Number(r.lon);
-    // Use HAE if available, otherwise fall back to alt
-    const alt2 = Number(r.altHae) || Number(r.alt) || 0;
+    // For vertical error calculation, use HAE to match test points (ellipsoid)
+    const alt2Hae = Number(r.altHae) || Number(r.alt) || 0;
+    // For display in Google Earth (absolute mode), use Geoid/MSL altitude
+    const alt2Display = Number(r.altGeoid) || Number(r.alt) || 0;
 
     // Safety check for valid coordinates
     if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) continue;
@@ -54,8 +56,8 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     const horizontalError = R * c;
     
-    // Calculate vertical error in meters
-    const verticalError = Math.abs(alt2 - alt1);
+    // Calculate vertical error in meters (compare HAE to HAE)
+    const verticalError = Math.abs(alt2Hae - alt1);
     
     // Determine pass/fail based on thresholds
     const isPassing = horizontalError <= 50 && verticalError <= 5;
@@ -67,16 +69,22 @@ export function buildCallKmlFromRows({ rows, testPoints, docName, groupByPartici
     const folderName = groupByParticipant ? String(r.participant || "Unknown").trim() : "Vectors";
     if (!groups[folderName]) groups[folderName] = [];
 
+    // Build enhanced label with point ID, timestamp, and error values
+    const timestamp = r.timestamp ? String(r.timestamp).trim() : "";
+    const timestampStr = timestamp ? ` | ${timestamp}` : "";
+    const errorStr = `H:${horizontalError.toFixed(1)}m V:${verticalError.toFixed(1)}m`;
+    const labelName = `Pt ${pointId}${timestampStr} | ${errorStr}`;
+
     // Build the Placemark as a single clean string
     const pm = [
       '    <Placemark>',
-      `      <name>${xmlEscape("Pt " + pointId)}</name>`,
+      `      <name>${xmlEscape(labelName)}</name>`,
       `      <styleUrl>${styleUrl}</styleUrl>`,
       '      <LineString>',
       '        <tessellate>1</tessellate>',
       '        <altitudeMode>absolute</altitudeMode>',
       '        <extrude>0</extrude>',
-      `        <coordinates>${lon1},${lat1},${alt1} ${lon2},${lat2},${alt2}</coordinates>`,
+      `        <coordinates>${lon1},${lat1},${alt1} ${lon2},${lat2},${alt2Display}</coordinates>`,
       '      </LineString>',
       '    </Placemark>'
     ].join('\n');
