@@ -6,6 +6,8 @@ let groundTruth = null;
 let allProcessedData = []; // Store globally for filtering
 let weatherData = []; // Weather tab data for barometric drift detection
 let baroTrendData = []; // Baro Trend data
+let baroLogData = []; // Barometric tab data for latency check
+let locationGoogleData = []; // Locations Google tab data for latency check
 let smartInsights = []; // Root cause analysis insights
 
 async function init() {
@@ -232,6 +234,21 @@ function renderHorizontalFailures(data) {
     return;
   }
 
+  // Calculate weather stats for root cause analysis
+  // Get pressure change between first and last test timestamp
+  const weatherStats = { pressureShift: 0 };
+  
+  // Combine Weather and Barometric data
+  const allPressureData = [...weatherData, ...baroTrendData]
+    .filter(d => d.pressure !== undefined)
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  
+  if (allPressureData.length >= 2) {
+    const firstPressure = allPressureData[0].pressure;
+    const lastPressure = allPressureData[allPressureData.length - 1].pressure;
+    weatherStats.pressureShift = Math.abs(lastPressure - firstPressure);
+  }
+
   // Run root cause analysis
   analyzeRootCauses(data);
   const wifiDeadZones = detectWiFiDeadZones(failures, data);
@@ -313,12 +330,23 @@ function renderHorizontalFailures(data) {
           <th>V-Error</th>
           <th>Location Source</th>
           <th>Location Technology String</th>
+          <th>Sync Offset</th>
+          <th>Insights</th>
         </tr>
       </thead>
       <tbody>`;
 
   failures.forEach(f => {
-    const wifiInsight = wifiDeadZoneMap.get(f.pointId);
+    const rootCauses = getRootCause(f, data, weatherStats);
+    const insightTags = rootCauses.map(rc => 
+      `<span class="insight-tag tag-${rc.class}">${rc.text}</span>`
+    ).join(' ');
+    
+    const syncResult = calculateSyncOffset(f.timestamp, baroLogData);
+    const syncCell = syncResult.tooltip 
+      ? `<td class="${syncResult.status}" title="${syncResult.tooltip}">${syncResult.seconds}</td>`
+      : `<td class="${syncResult.status}">${syncResult.seconds}</td>`;
+    
     html += `
       <tr>
         <td>${f.pointId}</td>
@@ -327,7 +355,8 @@ function renderHorizontalFailures(data) {
         <td>${Math.abs(f.verticalError).toFixed(1)}m</td>
         <td>${f.locationSource || 'Unknown'}</td>
         <td>${f.tech || 'Unknown'}</td>
-        <td>${wifiInsight ? '<span style="color: var(--accent); font-size: 11px;">📶 ' + wifiInsight + '</span>' : ''}</td>
+        ${syncCell}
+        <td>${insightTags}</td>
       </tr>`;
   });
 
@@ -345,6 +374,21 @@ function renderVerticalFailures(data) {
   if (failures.length === 0) {
     container.innerHTML = '<div class="placeholder success">✅ No vertical failures detected.</div>';
     return;
+  }
+
+  // Calculate weather stats for root cause analysis
+  // Get pressure change between first and last test timestamp
+  const weatherStats = { pressureShift: 0 };
+  
+  // Combine Weather and Barometric data
+  const allPressureData = [...weatherData, ...baroTrendData]
+    .filter(d => d.pressure !== undefined)
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  
+  if (allPressureData.length >= 2) {
+    const firstPressure = allPressureData[0].pressure;
+    const lastPressure = allPressureData[allPressureData.length - 1].pressure;
+    weatherStats.pressureShift = Math.abs(lastPressure - firstPressure);
   }
 
   // Detect WiFi dead zones
@@ -429,13 +473,23 @@ function renderVerticalFailures(data) {
           <th>V-Error</th>
           <th>Location Source</th>
           <th>Location Technology String</th>
+          <th>Sync Offset</th>
           <th>Insights</th>
         </tr>
       </thead>
       <tbody>`;
 
   failures.forEach(f => {
-    const wifiInsight = wifiDeadZoneMap.get(f.pointId);
+    const rootCauses = getRootCause(f, data, weatherStats);
+    const insightTags = rootCauses.map(rc => 
+      `<span class="insight-tag tag-${rc.class}">${rc.text}</span>`
+    ).join(' ');
+    
+    const syncResult = calculateSyncOffset(f.timestamp, baroLogData);
+    const syncCell = syncResult.tooltip 
+      ? `<td class="${syncResult.status}" title="${syncResult.tooltip}">${syncResult.seconds}</td>`
+      : `<td class="${syncResult.status}">${syncResult.seconds}</td>`;
+    
     html += `
       <tr>
         <td>${f.pointId}</td>
@@ -444,7 +498,8 @@ function renderVerticalFailures(data) {
         <td class="text-danger fw-bold">${Math.abs(f.verticalError).toFixed(1)}m</td>
         <td>${f.locationSource || 'Unknown'}</td>
         <td>${f.tech || 'Unknown'}</td>
-        <td>${wifiInsight ? '<span style="color: var(--accent); font-size: 11px;">📶 ' + wifiInsight + '</span>' : ''}</td>
+        ${syncCell}
+        <td>${insightTags}</td>
       </tr>`;
   });
 
@@ -575,6 +630,165 @@ function renderSmartInsights() {
   
   html += '</div>';
   return html;
+}
+
+function getRootCause(row, allRows, weatherStats) {
+  const issues = [];
+  
+  // 1. WiFi Dead Zone Detection
+  const tech = (row.tech || '').toUpperCase();
+  const floor = row.floor;
+  if (tech.includes('CELL') && row.horizontalError > 50) {
+    // Check if WiFi is available on this floor
+    const hasWifiOnFloor = allRows.some(r => 
+      r.floor === floor && (r.tech || '').toUpperCase().includes('WIFI')
+    );
+    
+    if (hasWifiOnFloor) {
+      issues.push({ 
+        text: 'WiFi Dead Zone', 
+        class: 'infrastructure' 
+      });
+    }
+  }
+  
+  // 2. Atmospheric Drift Detection
+  // If pressure shift > 1 millibar, tag all points with V-Error > 5m
+  if (weatherStats && weatherStats.pressureShift > 1.0) {
+    if (Math.abs(row.verticalError) > 5) {
+      issues.push({ 
+        text: 'Atmospheric Drift', 
+        class: 'weather' 
+      });
+    }
+  }
+  
+  // 3. Sensor Calibration Issue Detection
+  const deviceModel = row.make;
+  if (deviceModel) {
+    // Calculate average vertical error for this device model
+    const deviceErrors = allRows
+      .filter(r => r.make === deviceModel && r.verticalError !== undefined)
+      .map(r => r.verticalError);
+    
+    if (deviceErrors.length > 0) {
+      const avgDeviceError = deviceErrors.reduce((sum, e) => sum + e, 0) / deviceErrors.length;
+      
+      // If this device model averages >3m and current point is >5m
+      if (avgDeviceError > 3 && row.verticalError > 5) {
+        issues.push({ 
+          text: 'Sensor Calibration', 
+          class: 'hardware' 
+        });
+      }
+    }
+  }
+  
+  return issues;
+}
+
+function calculateSyncOffset(locationTimestamp, baroLogs) {
+  // Return null state if no data available
+  if (!locationTimestamp || !baroLogs || baroLogs.length === 0) {
+    return { seconds: '--', status: '', tooltip: '' };
+  }
+  
+  const locationTime = new Date(locationTimestamp).getTime();
+  
+  // Find the baro entry closest to the location fix time
+  const closestBaro = baroLogs.reduce((prev, curr) => {
+    if (!curr.timestamp) return prev;
+    if (!prev.timestamp) return curr;
+    
+    const currTime = new Date(curr.timestamp).getTime();
+    const prevTime = new Date(prev.timestamp).getTime();
+    
+    return (Math.abs(currTime - locationTime) < Math.abs(prevTime - locationTime) ? curr : prev);
+  });
+  
+  if (!closestBaro || !closestBaro.timestamp) {
+    return { seconds: '--', status: '', tooltip: '' };
+  }
+  
+  const closestBaroTime = new Date(closestBaro.timestamp).getTime();
+  const offsetMs = Math.abs(locationTime - closestBaroTime);
+  
+  // Status based on your concern about the USB daisy-chain
+  let status = 'sync-good';
+  let tooltip = '';
+  
+  if (offsetMs > 2000) {
+    status = 'sync-lag';
+  }
+  if (offsetMs > 5000) {
+    status = 'sync-critical';
+    tooltip = 'High Serial Latency - Check USB Chain';
+  }
+  
+  return {
+    seconds: (offsetMs / 1000).toFixed(1) + 's',
+    status: status,
+    tooltip: tooltip
+  };
+}
+
+function checkSystemHealth() {
+  const alertContainer = document.getElementById('system-health-alert');
+  
+  // Clear any existing alert
+  alertContainer.innerHTML = '';
+  
+  // Check if we have both datasets
+  if (baroLogData.length === 0 || locationGoogleData.length === 0) {
+    return; // No data to compare
+  }
+  
+  // Parse timestamps and calculate delays
+  const delays = [];
+  
+  baroLogData.forEach(baroReading => {
+    if (!baroReading.timestamp) return;
+    
+    const baroTime = new Date(baroReading.timestamp);
+    
+    // Find closest location fix
+    let closestDelay = Infinity;
+    
+    locationGoogleData.forEach(locationFix => {
+      if (!locationFix.timestamp) return;
+      
+      const locTime = new Date(locationFix.timestamp);
+      const delay = Math.abs(locTime - baroTime) / 1000; // Convert to seconds
+      
+      if (delay < closestDelay) {
+        closestDelay = delay;
+      }
+    });
+    
+    if (closestDelay !== Infinity) {
+      delays.push(closestDelay);
+    }
+  });
+  
+  // Calculate average delay
+  if (delays.length > 0) {
+    const avgDelay = delays.reduce((sum, d) => sum + d, 0) / delays.length;
+    
+    console.log(`System Health: Average Baro-Location delay = ${avgDelay.toFixed(2)}s`);
+    
+    // Display alert if average delay > 5 seconds
+    if (avgDelay > 5) {
+      alertContainer.innerHTML = `
+        <div class="audit-alert-banner">
+          <div style="font-size: 20px;">⚠️</div>
+          <div>
+            <div style="font-weight: 600; font-size: 14px;">CRITICAL LATENCY: Barometric Reference Delay Detected</div>
+            <div style="font-size: 12px; margin-top: 4px;">Check USB Hub connection. Average delay: ${avgDelay.toFixed(1)}s</div>
+          </div>
+        </div>
+      `;
+    }
+  }
 }
 
 // Helper: Calculate Percentile (Excel-compatible with linear interpolation)
@@ -715,12 +929,18 @@ function setupEventHandlers() {
             baroTrendData = trendSheet ? window.XLSX.utils.sheet_to_json(trendSheet) : [];
             
             const baroLogSheet = workbook.Sheets["Barometric"];
-            const baroLogs = baroLogSheet ? window.XLSX.utils.sheet_to_json(baroLogSheet) : [];
+            baroLogData = baroLogSheet ? window.XLSX.utils.sheet_to_json(baroLogSheet) : [];
+            
+            const locationGoogleSheet = workbook.Sheets["Locations Google"];
+            locationGoogleData = locationGoogleSheet ? window.XLSX.utils.sheet_to_json(locationGoogleSheet) : [];
             
             const weatherSheet = workbook.Sheets["Weather"];
             weatherData = weatherSheet ? window.XLSX.utils.sheet_to_json(weatherSheet) : [];
 
-            console.log(`Uploaded File Contents: ${baroTrendData.length} Baro Trends, ${baroLogs.length} Baro Logs, ${weatherData.length} Weather Records`);
+            console.log(`Uploaded File Contents: ${baroTrendData.length} Baro Trends, ${baroLogData.length} Baro Logs, ${locationGoogleData.length} Location Fixes, ${weatherData.length} Weather Records`);
+            
+            // Check system health for latency issues
+            checkSystemHealth();
 
             // 2. Process Correlation (using the static groundTruth loaded during init)
             allProcessedData = processCorrelationData(workbook, groundTruth);

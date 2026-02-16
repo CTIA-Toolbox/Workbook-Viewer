@@ -274,20 +274,54 @@ body {
 }
 
 /* Top-Level Building Health Alert */
+/* Latency & Hardware Alert */
 .audit-alert-banner {
-  background: linear-gradient(90deg, rgba(255, 92, 122, 0.1) 0%, rgba(18, 18, 23, 0) 100%);
-  border-left: 4px solid var(--danger);
-  padding: 12px 20px;
-  margin-bottom: 20px;
-  border-radius: 4px;
+  background: rgba(255, 171, 0, 0.1);
+  border: 1px solid rgba(255, 171, 0, 0.4);
+  border-left: 5px solid #ffab00; /* Warning Orange */
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 15px;
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 0 0 rgba(255, 171, 0, 0.2); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 171, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 171, 0, 0); }
 }
 
 .audit-alert-banner span {
   font-size: 13px;
   color: #eee;
+}
+
+.latency-value {
+  font-family: var(--mono);
+  font-weight: bold;
+  color: #ffab00;
+  margin-left: 5px;
+}
+
+/* Sync Offset Highlighting */
+.sync-good { color: #4ade80; } /* Green - Healthy */
+
+.sync-lag { 
+    color: #ffab00; 
+    font-weight: bold;
+    text-decoration: underline dotted;
+} 
+
+.sync-critical { 
+    color: var(--danger); 
+    font-weight: 900;
+    animation: blinker 1.5s linear infinite;
+}
+
+@keyframes blinker {
+    50% { opacity: 0.5; }
 }
 
 .failure-section {
