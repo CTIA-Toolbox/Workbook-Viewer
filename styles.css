@@ -235,6 +235,11 @@ body {
   vertical-align: top;
   max-width: 200px;
 }
+
+.p80-breakdown-cell {
+  line-height: 1.8;
+  font-size: 13px;
+}
 .failure-section {
   border-color: rgba(255, 92, 122, 0.3);
   margin-top: 2rem;

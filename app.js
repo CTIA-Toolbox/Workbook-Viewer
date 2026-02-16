@@ -181,9 +181,9 @@ function renderFailTable(stats) {
         const techBreakdown = Object.entries(data.techMap)
             .map(([tech, count]) => {
                 const percentage = ((count / data.count) * 100).toFixed(0);
-                return `<span class="badge">${tech}: ${percentage}%</span>`;
+                return `${tech}: ${percentage}%`;
             })
-            .join(' ');
+            .join('<br>');
         
         // Calculate P80 values for each Location Source
         const sourceBreakdown = Object.entries(data.sourceErrorsMap)
@@ -208,9 +208,9 @@ function renderFailTable(stats) {
           <td>${device}</td>
           <td class="${p80H > 50 ? 'text-danger fw-bold' : ''}">${p80H.toFixed(1)}m</td>
           <td class="${p80V > 5 ? 'text-danger fw-bold' : ''}">${p80V.toFixed(1)}m</td>
-          <td style="display: flex; flex-wrap: wrap; gap: 4px;">${techBreakdown}</td>
-          <td>${sourceBreakdown}</td>
-          <td>${techStringBreakdown}</td>
+          <td class="p80-breakdown-cell">${techBreakdown}</td>
+          <td class="p80-breakdown-cell">${sourceBreakdown}</td>
+          <td class="p80-breakdown-cell">${techStringBreakdown}</td>
         </tr>`;
     }
     html += `</tbody></table>`;
