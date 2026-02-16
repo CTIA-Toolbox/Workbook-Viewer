@@ -5,7 +5,7 @@
 // - This caches only local assets. Pyodide is loaded from a CDN and is not cached here.
 // - Extend later: add a user prompt, versioning strategy, and optional CDN caching.
 
-const CACHE_NAME = 'workbook-viewer-v1';
+const CACHE_NAME = 'workbook-viewer-v2';
 
 const APP_SHELL = [
   './',
@@ -13,6 +13,9 @@ const APP_SHELL = [
   './styles.css',
   './correlationReader.js',
   './app.js',
+  './kmlBuilder.js',
+  './testPointLoader.js',
+  './utils.js',
   './manifest.json',
   './icons/icon.svg',
   './icons/maskable.svg',

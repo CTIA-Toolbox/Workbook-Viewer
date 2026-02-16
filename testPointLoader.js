@@ -1,49 +1,50 @@
 // testPointLoader.js
-// Loads TestPoints.xlsx and builds a lookup table keyed by Test Point ID.
+// Updated to load Test Points, Barometric Logs, and Baro Trends from the workbook.
 
-export async function loadTestPoints() {
+export async function loadBuildingData() {
   try {
-    // Fetch from your repo (cache: 'no-store' ensures you get the latest version)
     const resp = await fetch('./TestPoints.xlsx', { cache: 'no-store' });
-
-    if (!resp.ok) {
-      console.error("Failed to load TestPoints.xlsx:", resp.status);
-      return null;
-    }
+    if (!resp.ok) return null;
 
     const arrayBuffer = await resp.arrayBuffer();
-    
-    // Note: We use window.XLSX because it's loaded via CDN in your HTML
     const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
 
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rows = window.XLSX.utils.sheet_to_json(sheet);
+    // 1. Load Ground Truth (Test Points)
+    const tpSheet = workbook.Sheets["TestPoints"] || workbook.Sheets[workbook.SheetNames[0]];
+    const tpRows = window.XLSX.utils.sheet_to_json(tpSheet);
+    const testPointLookup = {};
 
-    const lookup = {};
-
-    for (const r of rows) {
-      // Force ID to string to avoid "101" !== 101 mismatch issues
+    tpRows.forEach(r => {
       const id = r["Test Point ID"] ? String(r["Test Point ID"]).trim() : null;
-      if (!id) continue;
+      if (id) {
+        testPointLookup[id] = {
+          lat: Number(r["Latitude"]),
+          lon: Number(r["Longitude"]),
+          alt: Number(r["Altitude (Ellipsoid) Meters"]) || 0,
+          floor: r["Floor"]
+        };
+      }
+    });
 
-      lookup[id] = {
-        lat: Number(r["Latitude"]),
-        lon: Number(r["Longitude"]),
-        alt: Number(r["Altitude (Ellipsoid) Meters"]) || 0,
-        building: r["Building ID"],
-        floor: r["Floor"]
-      };
-    }
+    // 2. Load Baro Trend (The link between Points and Pressure)
+    const trendSheet = workbook.Sheets["Baro Trend"];
+    const baroTrends = trendSheet ? window.XLSX.utils.sheet_to_json(trendSheet) : [];
 
-    const loadedIds = Object.keys(lookup);
-    console.log(`Loaded ${loadedIds.length} test points from lookup.`);
-    console.log("Sample test point IDs:", loadedIds.slice(0, 10));
-    console.log("Sample test point data:", lookup[loadedIds[0]]);
-    return lookup;
+    // 3. Load Barometric (The raw reference pressure log)
+    const baroLogSheet = workbook.Sheets["Barometric"];
+    const baroLogs = baroLogSheet ? window.XLSX.utils.sheet_to_json(baroLogSheet) : [];
+
+    console.log(`Loaded ${Object.keys(testPointLookup).length} Test Points.`);
+    console.log(`Loaded ${baroTrends.length} Baro Trend entries.`);
+
+    return {
+      testPoints: testPointLookup,
+      trends: baroTrends,
+      logs: baroLogs
+    };
 
   } catch (err) {
-    console.error("Error loading TestPoints.xlsx:", err);
+    console.error("Error loading building data:", err);
     return null;
   }
 }
