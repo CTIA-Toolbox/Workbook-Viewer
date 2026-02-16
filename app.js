@@ -37,24 +37,26 @@ function populateFilters(data) {
 }
 
 function generateInsights(processedRows) {
-    const deviceStats = {};
-    const container = document.getElementById('insights-results');
+  const deviceStats = {};
 
-    processedRows.forEach(row => {
-        if (!deviceStats[row.device]) {
-            deviceStats[row.device] = { count: 0, totalH: 0, totalV: 0, failures: 0 };
-        }
-        const stats = deviceStats[row.device];
-        stats.count++;
-        stats.totalH += row.horizontalError || 0;
-        stats.totalV += Math.abs(row.verticalError || 0);
-        if (row.horizontalError > 50) stats.failures++;
-    });
+  processedRows.forEach(row => {
+    if (!deviceStats[row.device]) {
+      deviceStats[row.device] = { count: 0, hFails: 0, vFails: 0, techMap: {} };
+    }
+    const stats = deviceStats[row.device];
+    stats.count++;
+    if (row.horizontalError > 50) stats.hFails++;
+    if (Math.abs(row.verticalError) > 5) stats.vFails++;
 
-    renderInsightsTable(deviceStats);
+    // Track which Tech is being used
+    const tech = row.tech || "Unknown";
+    stats.techMap[tech] = (stats.techMap[tech] || 0) + 1;
+  });
+
+  renderFailTable(deviceStats);
 }
 
-function renderInsightsTable(stats) {
+function renderFailTable(stats) {
     const container = document.getElementById('insights-results');
     
     // Sort devices by average horizontal error (worst to best)
@@ -87,25 +89,82 @@ function renderInsightsTable(stats) {
     container.innerHTML = html;
 }
 
+function renderFailingPoints(data) {
+  const container = document.getElementById('failing-points-list');
+  
+  // Filter for ANY failure (H > 50m OR V > 5m)
+  const failures = data.filter(d => d.horizontalError > 50 || Math.abs(d.verticalError) > 5);
+  
+  if (failures.length === 0) {
+    container.innerHTML = '<div class="placeholder success">✅ No points exceeding failure thresholds.</div>';
+    return;
+  }
+
+  let html = `
+    <table class="insight-table">
+      <thead>
+        <tr>
+          <th>Point ID</th>
+          <th>Floor</th>
+          <th>H-Error</th>
+          <th>V-Error</th>
+          <th>Tech used</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  failures.forEach(f => {
+    const hClass = f.horizontalError > 50 ? 'text-danger fw-bold' : '';
+    const vClass = Math.abs(f.verticalError) > 5 ? 'text-danger fw-bold' : '';
+    
+    html += `
+      <tr>
+        <td>${f.pointId}</td>
+        <td>${f.floor}</td>
+        <td class="${hClass}">${f.horizontalError.toFixed(1)}m</td>
+        <td class="${vClass}">${f.verticalError.toFixed(1)}m</td>
+        <td><span class="badge">${f.tech}</span></td>
+      </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+}
+
+// Helper: Calculate Percentile
+function getPercentile(arr, percentile) {
+  if (arr.length === 0) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const index = Math.ceil((percentile / 100) * sorted.length) - 1;
+  return sorted[index];
+}
+
 function updateKPIs(processedRows) {
-    if (processedRows.length === 0) {
-        document.getElementById('metric-avg-h').textContent = '--';
-        document.getElementById('metric-avg-v').textContent = '--';
-        document.getElementById('metric-yield').textContent = '--';
-        return;
-    }
+  if (processedRows.length === 0) {
+    document.getElementById('metric-avg-h').textContent = '--';
+    document.getElementById('metric-avg-v').textContent = '--';
+    document.getElementById('metric-yield').textContent = '--';
+    return;
+  }
 
-    let totalH = 0, totalV = 0, withinSpec = 0;
-    processedRows.forEach(row => {
-        totalH += row.horizontalError || 0;
-        totalV += Math.abs(row.verticalError || 0);
-        // Industry Standard: "Yield" usually refers to Floor-level accuracy (< 3m)
-        if (Math.abs(row.verticalError) <= 3) withinSpec++;
-    });
+  const hErrors = processedRows.map(d => d.horizontalError || 0);
+  const vErrors = processedRows.map(d => Math.abs(d.verticalError || 0));
 
-    document.getElementById('metric-avg-h').textContent = `${(totalH / processedRows.length).toFixed(2)}m`;
-    document.getElementById('metric-avg-v').textContent = `${(totalV / processedRows.length).toFixed(2)}m`;
-    document.getElementById('metric-yield').textContent = `${((withinSpec / processedRows.length) * 100).toFixed(1)}%`;
+  // P80 Calculation
+  const p80H = getPercentile(hErrors, 80);
+  const p80V = getPercentile(vErrors, 80);
+
+  // Failure Rates
+  const failsH = processedRows.filter(d => (d.horizontalError || 0) > 50).length;
+  const failsV = processedRows.filter(d => Math.abs(d.verticalError || 0) > 5).length;
+  
+  const failRateH = ((failsH / processedRows.length) * 100).toFixed(1);
+  const failRateV = ((failsV / processedRows.length) * 100).toFixed(1);
+
+  // Update UI
+  document.getElementById('metric-avg-h').innerHTML = `${p80H.toFixed(1)}m <small>(P80)</small>`;
+  document.getElementById('metric-avg-v').innerHTML = `${p80V.toFixed(1)}m <small>(P80)</small>`;
+  document.getElementById('metric-yield').innerHTML = `${failRateH}% <small>H-Fail</small>`;
 }
 
 function updateStatus(message) {
@@ -140,6 +199,7 @@ function setupEventHandlers() {
                 populateFilters(allProcessedData);
                 updateKPIs(allProcessedData);
                 generateInsights(allProcessedData);
+                renderFailingPoints(allProcessedData);
                 updateStatus(`✓ Loaded ${allProcessedData.length} entries`);
                 document.getElementById('btn-export-kml').disabled = false;
                 document.getElementById('btn-export-csv').disabled = false;
@@ -161,6 +221,51 @@ function setupEventHandlers() {
         
         updateKPIs(filtered);
         generateInsights(filtered);
+        renderFailingPoints(filtered);
+    });
+
+    // CSV Export Handler
+    document.getElementById('btn-export-csv').addEventListener('click', () => {
+        if (!allProcessedData || allProcessedData.length === 0) return;
+
+        // 1. Calculate Summary Stats for the CSV Header
+        const hErrors = allProcessedData.map(d => d.horizontalError || 0);
+        const vErrors = allProcessedData.map(d => Math.abs(d.verticalError || 0));
+        const p80H = getPercentile(hErrors, 80);
+        const p80V = getPercentile(vErrors, 80);
+
+        // 2. Build the CSV Content
+        let csvContent = "data:text/csv;charset=utf-8,";
+        
+        // Header Section: Building Performance Summary
+        csvContent += "BUILDING AUDIT SUMMARY\n";
+        csvContent += `P80 Horizontal Error,${p80H.toFixed(2)}m (Threshold: 50m)\n`;
+        csvContent += `P80 Vertical Error,${p80V.toFixed(2)}m (Threshold: 5m)\n`;
+        csvContent += `Total Test Points,${allProcessedData.length}\n\n`;
+
+        // Data Section: The "Repair List" (Failing Points First)
+        csvContent += "POINT FAILURE LOG\n";
+        csvContent += "Point ID,Floor,Horizontal Error (m),Vertical Error (m),Technology,Status\n";
+
+        allProcessedData.forEach(row => {
+            const isHFail = row.horizontalError > 50;
+            const isVFail = Math.abs(row.verticalError) > 5;
+            const status = (isHFail || isVFail) ? "FAIL" : "PASS";
+
+            // Only export failures to keep the CSV focused (optional: export all)
+            if (status === "FAIL") {
+                csvContent += `${row.pointId},${row.floor},${row.horizontalError.toFixed(2)},${row.verticalError.toFixed(2)},${row.tech},${status}\n`;
+            }
+        });
+
+        // 3. Trigger Download
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Audit_Failures_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     });
 }
 

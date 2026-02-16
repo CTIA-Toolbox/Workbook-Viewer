@@ -197,6 +197,24 @@ body {
 .muted { color: var(--muted); }
 .small { font-size: 11px; }
 .hidden { display: none !important; }
+.text-danger { color: var(--danger) !important; }
+.fw-bold { font-weight: 700; }
+.badge {
+  background: rgba(255,255,255,0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  border: 1px solid var(--border);
+}
+.failure-section {
+  border-color: rgba(255, 92, 122, 0.3);
+  margin-top: 2rem;
+}
+.placeholder.success {
+  color: #4ade80;
+  font-weight: 500;
+}
 
 .file-row {
   display: flex;
@@ -382,6 +400,19 @@ input[type="file"], input[type="text"], select {
 }
 .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
 .btn.active { border-color: rgba(79,140,255,0.6); box-shadow: 0 0 0 2px rgba(79,140,255,0.15) inset; }
+
+.btn:not([disabled]) {
+  background: var(--accent);
+  color: white;
+  border-color: transparent;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn:not([disabled]):hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 12px rgba(79, 140, 255, 0.3);
+}
 
 .app-main {
   max-width: 1200px;

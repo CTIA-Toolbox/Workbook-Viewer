@@ -33,21 +33,18 @@
     
     <section class="dashboard-grid">
       <div class="kpi-card">
-        <span class="kpi-label">Avg Horizontal Error</span>
+        <span class="kpi-label">P80 Horizontal (Threshold 50m)</span>
         <span id="metric-avg-h" class="kpi-value">--</span>
-        <div id="trend-h" class="kpi-trend small"></div>
       </div>
       
       <div class="kpi-card">
-        <span class="kpi-label">Vertical Bias (Z-Axis)</span>
+        <span class="kpi-label">P80 Vertical (Threshold 5m)</span>
         <span id="metric-avg-v" class="kpi-value">--</span>
-        <div id="trend-v" class="kpi-trend small"></div>
       </div>
 
       <div class="kpi-card">
         <span class="kpi-label">Floor Yield (%)</span>
         <span id="metric-yield" class="kpi-value">--</span>
-        <div id="trend-yield" class="kpi-trend small"></div>
       </div>
     </section>
 
@@ -72,10 +69,21 @@
       </div>
     </section>
 
+    <section class="grid-card failure-section">
+      <div class="grid-toolbar">
+        <div id="failureSummary">
+          <strong class="text-danger">Critical Failures</strong> 
+          <span class="muted small">(H > 50m | V > 5m)</span>
+        </div>
+      </div>
+      <div id="failing-points-list" class="insight-table-wrapper">
+      </div>
+    </section>
+
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v2.6 
+    Building Audit Tool • v3.1 
   </footer>
 
   <script type="module" src="app.js"></script>
