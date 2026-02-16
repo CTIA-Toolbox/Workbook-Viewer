@@ -5,7 +5,7 @@
 // - This caches only local assets. External libraries loaded from CDN are not cached here.
 // - Extend later: add a user prompt, versioning strategy, and optional CDN caching.
 
-const CACHE_NAME = 'workbook-viewer-v26';
+const CACHE_NAME = 'workbook-viewer-v27';
 
 const APP_SHELL = [
   './',

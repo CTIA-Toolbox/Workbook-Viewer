@@ -690,27 +690,42 @@ function getRootCause(row, allRows, weatherStats) {
 function calculateSyncOffset(locationTimestamp, baroLogs) {
   // Return null state if no data available
   if (!locationTimestamp || !baroLogs || baroLogs.length === 0) {
+    console.log('Sync Offset Debug: Missing data', { 
+      hasTimestamp: !!locationTimestamp, 
+      baroLogsLength: baroLogs ? baroLogs.length : 0 
+    });
     return { seconds: '--', status: '', tooltip: '' };
   }
   
   const locationTime = new Date(locationTimestamp).getTime();
   
+  // Helper to get timestamp from baro entry (handle different field names)
+  const getBaroTimestamp = (baro) => {
+    return baro.Timestamp || baro.timestamp || baro.Time || baro.time || baro.DateTime || baro.dateTime;
+  };
+  
   // Find the baro entry closest to the location fix time
   const closestBaro = baroLogs.reduce((prev, curr) => {
-    if (!curr.timestamp) return prev;
-    if (!prev.timestamp) return curr;
+    const currTs = getBaroTimestamp(curr);
+    const prevTs = getBaroTimestamp(prev);
     
-    const currTime = new Date(curr.timestamp).getTime();
-    const prevTime = new Date(prev.timestamp).getTime();
+    if (!currTs) return prev;
+    if (!prevTs) return curr;
+    
+    const currTime = new Date(currTs).getTime();
+    const prevTime = new Date(prevTs).getTime();
     
     return (Math.abs(currTime - locationTime) < Math.abs(prevTime - locationTime) ? curr : prev);
   });
   
-  if (!closestBaro || !closestBaro.timestamp) {
+  const closestBaroTs = getBaroTimestamp(closestBaro);
+  
+  if (!closestBaro || !closestBaroTs) {
+    console.log('Sync Offset Debug: No valid baro timestamp found');
     return { seconds: '--', status: '', tooltip: '' };
   }
   
-  const closestBaroTime = new Date(closestBaro.timestamp).getTime();
+  const closestBaroTime = new Date(closestBaroTs).getTime();
   const offsetMs = Math.abs(locationTime - closestBaroTime);
   
   // Status based on your concern about the USB daisy-chain
@@ -743,21 +758,28 @@ function checkSystemHealth() {
     return; // No data to compare
   }
   
+  // Helper to get timestamp from different field names
+  const getTimestamp = (obj) => {
+    return obj.Timestamp || obj.timestamp || obj.Time || obj.time || obj.DateTime || obj.dateTime;
+  };
+  
   // Parse timestamps and calculate delays
   const delays = [];
   
   baroLogData.forEach(baroReading => {
-    if (!baroReading.timestamp) return;
+    const baroTs = getTimestamp(baroReading);
+    if (!baroTs) return;
     
-    const baroTime = new Date(baroReading.timestamp);
+    const baroTime = new Date(baroTs);
     
     // Find closest location fix
     let closestDelay = Infinity;
     
     locationGoogleData.forEach(locationFix => {
-      if (!locationFix.timestamp) return;
+      const locTs = getTimestamp(locationFix);
+      if (!locTs) return;
       
-      const locTime = new Date(locationFix.timestamp);
+      const locTime = new Date(locTs);
       const delay = Math.abs(locTime - baroTime) / 1000; // Convert to seconds
       
       if (delay < closestDelay) {
@@ -931,8 +953,19 @@ function setupEventHandlers() {
             const baroLogSheet = workbook.Sheets["Barometric"];
             baroLogData = baroLogSheet ? window.XLSX.utils.sheet_to_json(baroLogSheet) : [];
             
+            // Debug: Log first baro entry to see field names
+            if (baroLogData.length > 0) {
+              console.log('First Barometric entry fields:', Object.keys(baroLogData[0]));
+              console.log('First Barometric entry:', baroLogData[0]);
+            }
+            
             const locationGoogleSheet = workbook.Sheets["Locations Google"];
             locationGoogleData = locationGoogleSheet ? window.XLSX.utils.sheet_to_json(locationGoogleSheet) : [];
+            
+            // Debug: Log first location entry to see field names
+            if (locationGoogleData.length > 0) {
+              console.log('First Location Google entry fields:', Object.keys(locationGoogleData[0]));
+            }
             
             const weatherSheet = workbook.Sheets["Weather"];
             weatherData = weatherSheet ? window.XLSX.utils.sheet_to_json(weatherSheet) : [];
