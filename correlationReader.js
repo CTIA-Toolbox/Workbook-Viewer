@@ -27,7 +27,16 @@ export function processCorrelationData(workbook, groundTruth) {
         uncertaintyH: Number(row["Horizontal Uncertainty"]),
         uncertaintyV: Number(row["Vertical Uncertainty"]),
         tech: row["Location Technology String"],
-        floor: row["Floor Number"]
+        floor: row["Floor Number"],
+        // Additional filter fields
+        completedCall: row["Completed Call"],
+        correlatedCall: row["Correlated Call"],
+        participant: row["Participant"],
+        carrier: row["Carrier"],
+        locationSource: row["Location Source"],
+        summaryPoolTech: row["Summary Pool Technology"],
+        validHorizontal: row["Valid Horizontal Location"],
+        validVertical: row["Valid Vertical Location"]
       };
 
       // If we have Ground Truth, calculate the "Insight" metrics
@@ -38,7 +47,14 @@ export function processCorrelationData(workbook, groundTruth) {
         
         // Calculate Errors
         data.horizontalError = calculateDistance(data.reportedLat, data.reportedLon, truth.lat, truth.lon);
-        data.verticalError = data.reportedAlt - truth.alt;
+        
+        // Use pre-calculated Vertical Error column if available, otherwise calculate as absolute difference
+        if (row["Vertical Error"] !== undefined && row["Vertical Error"] !== null) {
+          data.verticalError = Math.abs(Number(row["Vertical Error"]));
+        } else {
+          data.verticalError = Math.abs(data.reportedAlt - truth.alt);
+        }
+        
         data.isWithinUncertainty = data.horizontalError <= data.uncertaintyH;
       }
 

@@ -375,6 +375,23 @@ input[type="file"], input[type="text"], select {
   color: var(--text);
 }
 
+.filter-select {
+  font-size: 13px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.filter-select:hover {
+  border-color: rgba(79, 140, 255, 0.4);
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.15);
+}
+
 .building-text-actions {
   display: flex;
   gap: 8px;

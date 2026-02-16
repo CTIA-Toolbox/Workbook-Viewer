@@ -33,18 +33,77 @@
     
     <section class="dashboard-grid">
       <div class="kpi-card">
-        <span class="kpi-label">P80 Horizontal (Threshold 50m)</span>
+        <span class="kpi-label">80% Horizontal (Threshold 50m)</span>
         <span id="metric-avg-h" class="kpi-value">--</span>
       </div>
       
       <div class="kpi-card">
-        <span class="kpi-label">P80 Vertical (Threshold 5m)</span>
+        <span class="kpi-label">80% Vertical (Threshold 5m)</span>
         <span id="metric-avg-v" class="kpi-value">--</span>
       </div>
+    </section>
 
-      <div class="kpi-card">
-        <span class="kpi-label">Floor Yield (%)</span>
-        <span id="metric-yield" class="kpi-value">--</span>
+    <section class="grid-card">
+      <div class="grid-toolbar">
+        <div id="gridSummary">
+          <strong>Data Filters</strong>
+        </div>
+      </div>
+      <div style="padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+        <label>
+          <span class="label">Floor</span>
+          <select id="filter-floor" class="filter-select">
+            <option value="all">All Floors</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Completed Call</span>
+          <select id="filter-completed-call" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Correlated Call</span>
+          <select id="filter-correlated-call" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Participant</span>
+          <select id="filter-participant" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Carrier</span>
+          <select id="filter-carrier" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Location Source</span>
+          <select id="filter-location-source" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Summary Pool Technology</span>
+          <select id="filter-summary-pool-tech" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Valid Horizontal</span>
+          <select id="filter-valid-horizontal" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Valid Vertical</span>
+          <select id="filter-valid-vertical" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
       </div>
     </section>
 
@@ -53,14 +112,6 @@
         <div id="gridSummary">
           <strong>Device Performance Insights</strong>
           <span class="muted small" style="margin-left: 10px;">Grouped by Handset Model</span>
-        </div>
-        <div class="grid-tools">
-          <label>
-            <span>Floor Filter:</span>
-            <select id="filter-floor">
-              <option value="all">All Floors</option>
-            </select>
-          </label>
         </div>
       </div>
 
@@ -83,7 +134,7 @@
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v3.2 
+    Building Audit Tool • v3.3 
   </footer>
 
   <script type="module" src="app.js"></script>

@@ -19,21 +19,71 @@ async function init() {
   }
 }
 
-// 1. New: Populate Floor Filter Dropdown
+// Populate all filter dropdowns
 function populateFilters(data) {
-    const floorSelect = document.getElementById('filter-floor');
-    if (!floorSelect) return;
+    // Helper to populate a dropdown
+    const populateDropdown = (id, fieldName, labelPrefix = '') => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        
+        const values = [...new Set(data.map(d => d[fieldName]).filter(v => v !== undefined && v !== null && v !== ''))];
+        select.innerHTML = '<option value="all">All</option>';
+        
+        values.sort((a, b) => {
+            if (typeof a === 'number' && typeof b === 'number') return a - b;
+            return String(a).localeCompare(String(b));
+        });
+        
+        values.forEach(val => {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = labelPrefix ? `${labelPrefix} ${val}` : val;
+            select.appendChild(opt);
+        });
+    };
 
-    // Reset except for "All Floors"
-    floorSelect.innerHTML = '<option value="all">All Floors</option>';
-    
-    const floors = [...new Set(data.map(d => d.floor))].sort((a, b) => a - b);
-    floors.forEach(f => {
-        const opt = document.createElement('option');
-        opt.value = f;
-        opt.textContent = `Floor ${f}`;
-        floorSelect.appendChild(opt);
+    // Populate all filters
+    populateDropdown('filter-floor', 'floor', 'Floor');
+    populateDropdown('filter-completed-call', 'completedCall');
+    populateDropdown('filter-correlated-call', 'correlatedCall');
+    populateDropdown('filter-participant', 'participant');
+    populateDropdown('filter-carrier', 'carrier');
+    populateDropdown('filter-location-source', 'locationSource');
+    populateDropdown('filter-summary-pool-tech', 'summaryPoolTech');
+    populateDropdown('filter-valid-horizontal', 'validHorizontal');
+    populateDropdown('filter-valid-vertical', 'validVertical');
+}
+
+// Apply all active filters
+function applyFilters() {
+    const filters = {
+        floor: document.getElementById('filter-floor').value,
+        completedCall: document.getElementById('filter-completed-call').value,
+        correlatedCall: document.getElementById('filter-correlated-call').value,
+        participant: document.getElementById('filter-participant').value,
+        carrier: document.getElementById('filter-carrier').value,
+        locationSource: document.getElementById('filter-location-source').value,
+        summaryPoolTech: document.getElementById('filter-summary-pool-tech').value,
+        validHorizontal: document.getElementById('filter-valid-horizontal').value,
+        validVertical: document.getElementById('filter-valid-vertical').value
+    };
+
+    const filtered = allProcessedData.filter(d => {
+        if (filters.floor !== 'all' && String(d.floor) !== filters.floor) return false;
+        if (filters.completedCall !== 'all' && String(d.completedCall) !== filters.completedCall) return false;
+        if (filters.correlatedCall !== 'all' && String(d.correlatedCall) !== filters.correlatedCall) return false;
+        if (filters.participant !== 'all' && String(d.participant) !== filters.participant) return false;
+        if (filters.carrier !== 'all' && String(d.carrier) !== filters.carrier) return false;
+        if (filters.locationSource !== 'all' && String(d.locationSource) !== filters.locationSource) return false;
+        if (filters.summaryPoolTech !== 'all' && String(d.summaryPoolTech) !== filters.summaryPoolTech) return false;
+        if (filters.validHorizontal !== 'all' && String(d.validHorizontal) !== filters.validHorizontal) return false;
+        if (filters.validVertical !== 'all' && String(d.validVertical) !== filters.validVertical) return false;
+        return true;
     });
+
+    updateKPIs(filtered);
+    generateInsights(filtered);
+    renderFailingPoints(filtered);
 }
 
 function generateInsights(processedRows) {
@@ -151,7 +201,6 @@ function updateKPIs(processedRows) {
   if (processedRows.length === 0) {
     document.getElementById('metric-avg-h').textContent = '--';
     document.getElementById('metric-avg-v').textContent = '--';
-    document.getElementById('metric-yield').textContent = '--';
     return;
   }
 
@@ -162,17 +211,9 @@ function updateKPIs(processedRows) {
   const p80H = getPercentile(hErrors, 80);
   const p80V = getPercentile(vErrors, 80);
 
-  // Failure Rates
-  const failsH = processedRows.filter(d => (d.horizontalError || 0) > 50).length;
-  const failsV = processedRows.filter(d => Math.abs(d.verticalError || 0) > 5).length;
-  
-  const failRateH = ((failsH / processedRows.length) * 100).toFixed(1);
-  const failRateV = ((failsV / processedRows.length) * 100).toFixed(1);
-
   // Update UI
-  document.getElementById('metric-avg-h').innerHTML = `${p80H.toFixed(1)}m <small>(P80)</small>`;
-  document.getElementById('metric-avg-v').innerHTML = `${p80V.toFixed(1)}m <small>(P80)</small>`;
-  document.getElementById('metric-yield').innerHTML = `${failRateH}% <small>H-Fail</small>`;
+  document.getElementById('metric-avg-h').innerHTML = `${p80H.toFixed(1)}m <small>80%</small>`;
+  document.getElementById('metric-avg-v').innerHTML = `${p80V.toFixed(1)}m <small>80%</small>`;
 }
 
 function updateStatus(message) {
@@ -220,16 +261,24 @@ function setupEventHandlers() {
         }
     });
 
-    // Floor Filter Handler
-    document.getElementById('filter-floor').addEventListener('change', (e) => {
-        const val = e.target.value;
-        const filtered = val === 'all' 
-            ? allProcessedData 
-            : allProcessedData.filter(d => String(d.floor) === val);
-        
-        updateKPIs(filtered);
-        generateInsights(filtered);
-        renderFailingPoints(filtered);
+    // Filter change handlers - attach to all filter dropdowns
+    const filterIds = [
+        'filter-floor',
+        'filter-completed-call',
+        'filter-correlated-call',
+        'filter-participant',
+        'filter-carrier',
+        'filter-location-source',
+        'filter-summary-pool-tech',
+        'filter-valid-horizontal',
+        'filter-valid-vertical'
+    ];
+
+    filterIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', applyFilters);
+        }
     });
 
     // CSV Export Handler
