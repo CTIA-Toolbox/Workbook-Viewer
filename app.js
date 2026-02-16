@@ -84,47 +84,55 @@ function updateStatus(message) {
   if (statusEl) statusEl.textContent = message;
 }
 
-// File input handler
-document.getElementById('file-input').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+function setupEventHandlers() {
+  // File input handler
+  document.getElementById('file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  updateStatus('Processing workbook...');
-  
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+    updateStatus('Processing workbook...');
     
-    const processedData = processCorrelationData(workbook, groundTruth);
-    
-    if (processedData && processedData.length > 0) {
-      updateKPIs(processedData);
-      generateInsights(processedData);
-      updateStatus(`✓ Loaded ${processedData.length} correlation entries`);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
       
-      // Enable export buttons
-      document.getElementById('btn-export-kml').disabled = false;
-      document.getElementById('btn-export-csv').disabled = false;
-    } else {
-      updateStatus('⚠ No data found in Correlation sheet');
+      const processedData = processCorrelationData(workbook, groundTruth);
+      
+      if (processedData && processedData.length > 0) {
+        updateKPIs(processedData);
+        generateInsights(processedData);
+        updateStatus(`✓ Loaded ${processedData.length} correlation entries`);
+        
+        // Enable export buttons
+        document.getElementById('btn-export-kml').disabled = false;
+        document.getElementById('btn-export-csv').disabled = false;
+      } else {
+        updateStatus('⚠ No data found in Correlation sheet');
+      }
+    } catch (err) {
+      console.error('Error processing file:', err);
+      updateStatus('⚠ Error processing file: ' + err.message);
     }
-  } catch (err) {
-    console.error('Error processing file:', err);
-    updateStatus('⚠ Error processing file: ' + err.message);
-  }
-});
+  });
 
-// Export handlers (placeholders for now)
-document.getElementById('btn-export-kml').addEventListener('click', () => {
-  updateStatus('KML export feature coming soon...');
-});
+  // Export handlers (placeholders for now)
+  document.getElementById('btn-export-kml').addEventListener('click', () => {
+    updateStatus('KML export feature coming soon...');
+  });
 
-document.getElementById('btn-export-csv').addEventListener('click', () => {
-  updateStatus('CSV export feature coming soon...');
-});
+  document.getElementById('btn-export-csv').addEventListener('click', () => {
+    updateStatus('CSV export feature coming soon...');
+  });
+}
 
-// Initialize the app
-init().then(() => {
+// Initialize the app when DOM is ready
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('App initializing...');
+  
+  setupEventHandlers();
+  
+  await init();
+  
   if (groundTruth && Object.keys(groundTruth).length > 0) {
     updateStatus(`✓ Ground truth loaded. Upload a correlation workbook to begin.`);
   } else {
