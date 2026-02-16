@@ -2,10 +2,10 @@
 // Minimal app-shell cache for offline-friendly behavior.
 //
 // Notes:
-// - This caches only local assets. Pyodide is loaded from a CDN and is not cached here.
+// - This caches only local assets. External libraries loaded from CDN are not cached here.
 // - Extend later: add a user prompt, versioning strategy, and optional CDN caching.
 
-const CACHE_NAME = 'workbook-viewer-v2';
+const CACHE_NAME = 'workbook-viewer-v3';
 
 const APP_SHELL = [
   './',
