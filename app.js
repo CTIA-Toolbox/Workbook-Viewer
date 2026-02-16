@@ -622,6 +622,30 @@ function setupEventHandlers() {
         const vErrors = allProcessedData.map(d => Math.abs(d.verticalError || 0));
         const p80H = getPercentile(hErrors, 80);
         const p80V = getPercentile(vErrors, 80);
+        const bias = calculateDirectionalBias(allProcessedData);
+
+        // Calculate breakdowns by Location Source and Technology String
+        const sourceErrorsMap = {};
+        const techStringErrorsMap = {};
+        
+        allProcessedData.forEach(row => {
+            const source = row.locationSource || 'Unknown';
+            const tech = row.tech || 'Unknown';
+            
+            if (!sourceErrorsMap[source]) {
+                sourceErrorsMap[source] = { hErrors: [], vErrors: [], count: 0 };
+            }
+            sourceErrorsMap[source].hErrors.push(row.horizontalError || 0);
+            sourceErrorsMap[source].vErrors.push(Math.abs(row.verticalError || 0));
+            sourceErrorsMap[source].count++;
+            
+            if (!techStringErrorsMap[tech]) {
+                techStringErrorsMap[tech] = { hErrors: [], vErrors: [], count: 0 };
+            }
+            techStringErrorsMap[tech].hErrors.push(row.horizontalError || 0);
+            techStringErrorsMap[tech].vErrors.push(Math.abs(row.verticalError || 0));
+            techStringErrorsMap[tech].count++;
+        });
 
         // 2. Build the CSV Content
         let csvContent = "data:text/csv;charset=utf-8,";
@@ -630,11 +654,40 @@ function setupEventHandlers() {
         csvContent += "BUILDING AUDIT SUMMARY\n";
         csvContent += `P80 Horizontal Error,${p80H.toFixed(2)}m (Threshold: 50m)\n`;
         csvContent += `P80 Vertical Error,${p80V.toFixed(2)}m (Threshold: 5m)\n`;
+        csvContent += `Directional Bias,${bias.direction || 'N/A'}\n`;
+        csvContent += `Horizontal Bias Magnitude,${bias.magnitude ? bias.magnitude.toFixed(2) + 'm' : 'N/A'}\n`;
+        csvContent += `Vertical Bias,${bias.verticalBias !== undefined ? (bias.verticalBias > 0 ? '↑' : '↓') + Math.abs(bias.verticalBias).toFixed(2) + 'm' : 'N/A'}\n`;
         csvContent += `Total Test Points,${allProcessedData.length}\n\n`;
+
+        // Location Source Breakdown
+        csvContent += "LOCATION SOURCE BREAKDOWN\n";
+        csvContent += "Source,Count,Percentage,P80 Horizontal (m),P80 Vertical (m)\n";
+        Object.entries(sourceErrorsMap)
+            .sort((a, b) => b[1].count - a[1].count)
+            .forEach(([source, data]) => {
+                const percentage = ((data.count / allProcessedData.length) * 100).toFixed(1);
+                const p80H = getPercentile(data.hErrors, 80);
+                const p80V = getPercentile(data.vErrors, 80);
+                csvContent += `${source},${data.count},${percentage}%,${p80H.toFixed(2)},${p80V.toFixed(2)}\n`;
+            });
+        csvContent += "\n";
+
+        // Technology String Breakdown
+        csvContent += "TECHNOLOGY STRING BREAKDOWN\n";
+        csvContent += "Technology,Count,Percentage,P80 Horizontal (m),P80 Vertical (m)\n";
+        Object.entries(techStringErrorsMap)
+            .sort((a, b) => b[1].count - a[1].count)
+            .forEach(([tech, data]) => {
+                const percentage = ((data.count / allProcessedData.length) * 100).toFixed(1);
+                const p80H = getPercentile(data.hErrors, 80);
+                const p80V = getPercentile(data.vErrors, 80);
+                csvContent += `${tech},${data.count},${percentage}%,${p80H.toFixed(2)},${p80V.toFixed(2)}\n`;
+            });
+        csvContent += "\n";
 
         // Data Section: The "Repair List" (Failing Points First)
         csvContent += "POINT FAILURE LOG\n";
-        csvContent += "Point ID,Floor,Horizontal Error (m),Vertical Error (m),Technology,Status\n";
+        csvContent += "Point ID,Floor,Horizontal Error (m),Vertical Error (m),Location Source,Technology String,Status\n";
 
         allProcessedData.forEach(row => {
             const isHFail = row.horizontalError > 50;
@@ -643,7 +696,7 @@ function setupEventHandlers() {
 
             // Only export failures to keep the CSV focused (optional: export all)
             if (status === "FAIL") {
-                csvContent += `${row.pointId},${row.floor},${row.horizontalError.toFixed(2)},${row.verticalError.toFixed(2)},${row.tech},${status}\n`;
+                csvContent += `${row.pointId},${row.floor},${row.horizontalError.toFixed(2)},${Math.abs(row.verticalError).toFixed(2)},${row.locationSource || 'Unknown'},${row.tech || 'Unknown'},${status}\n`;
             }
         });
 
