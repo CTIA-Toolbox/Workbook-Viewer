@@ -93,6 +93,12 @@
           </select>
         </label>
         <label>
+          <span class="label">Location Technology String</span>
+          <select id="filter-location-tech-string" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
           <span class="label">Valid Horizontal</span>
           <select id="filter-valid-horizontal" class="filter-select">
             <option value="all">All</option>
@@ -122,19 +128,30 @@
 
     <section class="grid-card failure-section">
       <div class="grid-toolbar">
-        <div id="failureSummary">
-          <strong class="text-danger">Critical Failures</strong> 
-          <span class="muted small">(H > 50m | V > 5m)</span>
+        <div id="hFailureSummary">
+          <strong class="text-danger">Horizontal Failures</strong> 
+          <span class="muted small">(H > 50m)</span>
         </div>
       </div>
-      <div id="failing-points-list" class="insight-table-wrapper">
+      <div id="h-failing-points-list" class="insight-table-wrapper">
+      </div>
+    </section>
+
+    <section class="grid-card failure-section">
+      <div class="grid-toolbar">
+        <div id="vFailureSummary">
+          <strong class="text-danger">Vertical Failures</strong> 
+          <span class="muted small">(V > 5m)</span>
+        </div>
+      </div>
+      <div id="v-failing-points-list" class="insight-table-wrapper">
       </div>
     </section>
 
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v3.3 
+    Building Audit Tool • v3.4 
   </footer>
 
   <script type="module" src="app.js"></script>

@@ -22,7 +22,7 @@ async function init() {
 // Populate all filter dropdowns
 function populateFilters(data) {
     // Helper to populate a dropdown
-    const populateDropdown = (id, fieldName, labelPrefix = '') => {
+    const populateDropdown = (id, fieldName, labelPrefix = '', defaultValue = null) => {
         const select = document.getElementById(id);
         if (!select) return;
         
@@ -40,18 +40,28 @@ function populateFilters(data) {
             opt.textContent = labelPrefix ? `${labelPrefix} ${val}` : val;
             select.appendChild(opt);
         });
+        
+        // Set default value if specified
+        if (defaultValue !== null) {
+            // Try to find exact match (TRUE or true)
+            const matchingValue = values.find(v => String(v).toLowerCase() === String(defaultValue).toLowerCase());
+            if (matchingValue) {
+                select.value = matchingValue;
+            }
+        }
     };
 
-    // Populate all filters
+    // Populate all filters (with defaults for boolean fields)
     populateDropdown('filter-floor', 'floor', 'Floor');
-    populateDropdown('filter-completed-call', 'completedCall');
-    populateDropdown('filter-correlated-call', 'correlatedCall');
+    populateDropdown('filter-completed-call', 'completedCall', '', 'TRUE');
+    populateDropdown('filter-correlated-call', 'correlatedCall', '', 'TRUE');
     populateDropdown('filter-participant', 'participant');
     populateDropdown('filter-carrier', 'carrier');
     populateDropdown('filter-location-source', 'locationSource');
     populateDropdown('filter-summary-pool-tech', 'summaryPoolTech');
-    populateDropdown('filter-valid-horizontal', 'validHorizontal');
-    populateDropdown('filter-valid-vertical', 'validVertical');
+    populateDropdown('filter-location-tech-string', 'tech');
+    populateDropdown('filter-valid-horizontal', 'validHorizontal', '', 'TRUE');
+    populateDropdown('filter-valid-vertical', 'validVertical', '', 'TRUE');
 }
 
 // Apply all active filters
@@ -64,6 +74,7 @@ function applyFilters() {
         carrier: document.getElementById('filter-carrier').value,
         locationSource: document.getElementById('filter-location-source').value,
         summaryPoolTech: document.getElementById('filter-summary-pool-tech').value,
+        locationTechString: document.getElementById('filter-location-tech-string').value,
         validHorizontal: document.getElementById('filter-valid-horizontal').value,
         validVertical: document.getElementById('filter-valid-vertical').value
     };
@@ -76,6 +87,7 @@ function applyFilters() {
         if (filters.carrier !== 'all' && String(d.carrier) !== filters.carrier) return false;
         if (filters.locationSource !== 'all' && String(d.locationSource) !== filters.locationSource) return false;
         if (filters.summaryPoolTech !== 'all' && String(d.summaryPoolTech) !== filters.summaryPoolTech) return false;
+        if (filters.locationTechString !== 'all' && String(d.tech) !== filters.locationTechString) return false;
         if (filters.validHorizontal !== 'all' && String(d.validHorizontal) !== filters.validHorizontal) return false;
         if (filters.validVertical !== 'all' && String(d.validVertical) !== filters.validVertical) return false;
         return true;
@@ -83,7 +95,15 @@ function applyFilters() {
 
     updateKPIs(filtered);
     generateInsights(filtered);
-    renderFailingPoints(filtered);
+    renderHorizontalFailures(filtered);
+    renderVerticalFailures(filtered);
+    
+    // Update status to show filter results
+    if (filtered.length < allProcessedData.length) {
+        updateStatus(`✓ Showing ${filtered.length} of ${allProcessedData.length} entries (filtered)`);
+    } else {
+        updateStatus(`✓ Loaded ${allProcessedData.length} entries`);
+    }
 }
 
 function generateInsights(processedRows) {
@@ -91,16 +111,39 @@ function generateInsights(processedRows) {
 
   processedRows.forEach(row => {
     if (!deviceStats[row.device]) {
-      deviceStats[row.device] = { count: 0, hFails: 0, vFails: 0, techMap: {} };
+      deviceStats[row.device] = { 
+        count: 0, 
+        hErrors: [], 
+        vErrors: [], 
+        techMap: {}, 
+        sourceErrorsMap: {},
+        techStringErrorsMap: {}
+      };
     }
     const stats = deviceStats[row.device];
     stats.count++;
-    if (row.horizontalError > 50) stats.hFails++;
-    if (Math.abs(row.verticalError) > 5) stats.vFails++;
+    stats.hErrors.push(row.horizontalError || 0);
+    stats.vErrors.push(Math.abs(row.verticalError || 0));
 
     // Track which Tech is being used
     const tech = row.tech || "Unknown";
     stats.techMap[tech] = (stats.techMap[tech] || 0) + 1;
+    
+    // Track errors by Location Source
+    const source = row.locationSource || "Unknown";
+    if (!stats.sourceErrorsMap[source]) {
+      stats.sourceErrorsMap[source] = { hErrors: [], vErrors: [] };
+    }
+    stats.sourceErrorsMap[source].hErrors.push(row.horizontalError || 0);
+    stats.sourceErrorsMap[source].vErrors.push(Math.abs(row.verticalError || 0));
+    
+    // Track errors by Location Technology String
+    const techString = row.tech || "Unknown";
+    if (!stats.techStringErrorsMap[techString]) {
+      stats.techStringErrorsMap[techString] = { hErrors: [], vErrors: [] };
+    }
+    stats.techStringErrorsMap[techString].hErrors.push(row.horizontalError || 0);
+    stats.techStringErrorsMap[techString].vErrors.push(Math.abs(row.verticalError || 0));
   });
 
   renderFailTable(deviceStats);
@@ -109,11 +152,11 @@ function generateInsights(processedRows) {
 function renderFailTable(stats) {
     const container = document.getElementById('insights-results');
     
-    // Sort devices by horizontal failure rate (worst to best)
+    // Sort devices by P80 horizontal error (worst to best)
     const sortedDevices = Object.entries(stats).sort((a, b) => {
-        const failRateA = a[1].hFails / a[1].count;
-        const failRateB = b[1].hFails / b[1].count;
-        return failRateB - failRateA; // Descending order (worst first)
+        const p80A = getPercentile(a[1].hErrors, 80);
+        const p80B = getPercentile(b[1].hErrors, 80);
+        return p80B - p80A; // Descending order (worst first)
     });
     
     let html = `
@@ -121,40 +164,67 @@ function renderFailTable(stats) {
       <thead>
         <tr>
           <th>Device</th>
-          <th>H-Fail Rate</th>
-          <th>V-Fail Rate</th>
-          <th>Primary Tech</th>
+          <th>H 80%</th>
+          <th>V 80%</th>
+          <th>Technology Usage</th>
+          <th>Location Source P80</th>
+          <th>Location Tech String P80</th>
         </tr>
       </thead>
       <tbody>`;
 
     for (const [device, data] of sortedDevices) {
-        const hFailRate = ((data.hFails / data.count) * 100).toFixed(1);
-        const vFailRate = ((data.vFails / data.count) * 100).toFixed(1);
+        const p80H = getPercentile(data.hErrors, 80);
+        const p80V = getPercentile(data.vErrors, 80);
         
-        // Get the most-used technology for this device
-        const primaryTech = Object.entries(data.techMap).sort((a, b) => b[1] - a[1])[0]?.[0] || "Unknown";
+        // Calculate percentage for each technology
+        const techBreakdown = Object.entries(data.techMap)
+            .map(([tech, count]) => {
+                const percentage = ((count / data.count) * 100).toFixed(0);
+                return `<span class="badge">${tech}: ${percentage}%</span>`;
+            })
+            .join(' ');
+        
+        // Calculate P80 values for each Location Source
+        const sourceBreakdown = Object.entries(data.sourceErrorsMap)
+            .map(([source, errors]) => {
+                const p80H = getPercentile(errors.hErrors, 80);
+                const p80V = getPercentile(errors.vErrors, 80);
+                return `<span class="badge">${source}: H${p80H.toFixed(1)}m V${p80V.toFixed(1)}m</span>`;
+            })
+            .join(' ');
+        
+        // Calculate P80 values for each Location Technology String
+        const techStringBreakdown = Object.entries(data.techStringErrorsMap)
+            .map(([techStr, errors]) => {
+                const p80H = getPercentile(errors.hErrors, 80);
+                const p80V = getPercentile(errors.vErrors, 80);
+                return `<span class="badge">${techStr}: H${p80H.toFixed(1)}m V${p80V.toFixed(1)}m</span>`;
+            })
+            .join(' ');
         
         html += `
         <tr>
           <td>${device}</td>
-          <td class="${hFailRate > 20 ? 'text-danger fw-bold' : ''}">${hFailRate}%</td>
-          <td class="${vFailRate > 20 ? 'text-danger fw-bold' : ''}">${vFailRate}%</td>
-          <td><span class="badge">${primaryTech}</span></td>
+          <td class="${p80H > 50 ? 'text-danger fw-bold' : ''}">${p80H.toFixed(1)}m</td>
+          <td class="${p80V > 5 ? 'text-danger fw-bold' : ''}">${p80V.toFixed(1)}m</td>
+          <td style="display: flex; flex-wrap: wrap; gap: 4px;">${techBreakdown}</td>
+          <td style="display: flex; flex-wrap: wrap; gap: 4px;">${sourceBreakdown}</td>
+          <td style="display: flex; flex-wrap: wrap; gap: 4px;">${techStringBreakdown}</td>
         </tr>`;
     }
     html += `</tbody></table>`;
     container.innerHTML = html;
 }
 
-function renderFailingPoints(data) {
-  const container = document.getElementById('failing-points-list');
+function renderHorizontalFailures(data) {
+  const container = document.getElementById('h-failing-points-list');
   
-  // Filter for ANY failure (H > 50m OR V > 5m)
-  const failures = data.filter(d => d.horizontalError > 50 || Math.abs(d.verticalError) > 5);
+  // Filter for horizontal failures (H > 50m)
+  const failures = data.filter(d => d.horizontalError > 50);
   
   if (failures.length === 0) {
-    container.innerHTML = '<div class="placeholder success">✅ No points exceeding failure thresholds.</div>';
+    container.innerHTML = '<div class="placeholder success">✅ No horizontal failures detected.</div>';
     return;
   }
 
@@ -172,15 +242,12 @@ function renderFailingPoints(data) {
       <tbody>`;
 
   failures.forEach(f => {
-    const hClass = f.horizontalError > 50 ? 'text-danger fw-bold' : '';
-    const vClass = Math.abs(f.verticalError) > 5 ? 'text-danger fw-bold' : '';
-    
     html += `
       <tr>
         <td>${f.pointId}</td>
         <td>${f.floor}</td>
-        <td class="${hClass}">${f.horizontalError.toFixed(1)}m</td>
-        <td class="${vClass}">${f.verticalError.toFixed(1)}m</td>
+        <td class="text-danger fw-bold">${f.horizontalError.toFixed(1)}m</td>
+        <td>${Math.abs(f.verticalError).toFixed(1)}m</td>
         <td><span class="badge">${f.tech}</span></td>
       </tr>`;
   });
@@ -189,12 +256,56 @@ function renderFailingPoints(data) {
   container.innerHTML = html;
 }
 
-// Helper: Calculate Percentile
+function renderVerticalFailures(data) {
+  const container = document.getElementById('v-failing-points-list');
+  
+  // Filter for vertical failures (V > 5m)
+  const failures = data.filter(d => Math.abs(d.verticalError) > 5);
+  
+  if (failures.length === 0) {
+    container.innerHTML = '<div class="placeholder success">✅ No vertical failures detected.</div>';
+    return;
+  }
+
+  let html = `
+    <table class="insight-table">
+      <thead>
+        <tr>
+          <th>Point ID</th>
+          <th>Floor</th>
+          <th>H-Error</th>
+          <th>V-Error</th>
+          <th>Tech used</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  failures.forEach(f => {
+    html += `
+      <tr>
+        <td>${f.pointId}</td>
+        <td>${f.floor}</td>
+        <td>${f.horizontalError.toFixed(1)}m</td>
+        <td class="text-danger fw-bold">${Math.abs(f.verticalError).toFixed(1)}m</td>
+        <td><span class="badge">${f.tech}</span></td>
+      </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+}
+
+// Helper: Calculate Percentile (Excel-compatible with linear interpolation)
 function getPercentile(arr, percentile) {
   if (arr.length === 0) return 0;
   const sorted = [...arr].sort((a, b) => a - b);
-  const index = Math.ceil((percentile / 100) * sorted.length) - 1;
-  return sorted[index];
+  const index = (percentile / 100) * (sorted.length - 1);
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  const weight = index - lower;
+  
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] * (1 - weight) + sorted[upper] * weight;
 }
 
 function updateKPIs(processedRows) {
@@ -244,12 +355,9 @@ function setupEventHandlers() {
             allProcessedData = processCorrelationData(workbook, groundTruth);
             
             if (allProcessedData.length > 0) {
-                // You now have access to both the specific test data AND the baro reference!
+                // Populate filters with defaults and apply them
                 populateFilters(allProcessedData);
-                updateKPIs(allProcessedData);
-                generateInsights(allProcessedData);
-                renderFailingPoints(allProcessedData);
-                updateStatus(`✓ Loaded ${allProcessedData.length} entries`);
+                applyFilters(); // This will update KPIs, insights, failing points, and status
                 document.getElementById('btn-export-kml').disabled = false;
                 document.getElementById('btn-export-csv').disabled = false;
             } else {
