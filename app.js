@@ -59,11 +59,11 @@ function generateInsights(processedRows) {
 function renderFailTable(stats) {
     const container = document.getElementById('insights-results');
     
-    // Sort devices by average horizontal error (worst to best)
+    // Sort devices by horizontal failure rate (worst to best)
     const sortedDevices = Object.entries(stats).sort((a, b) => {
-        const avgErrorA = a[1].totalH / a[1].count;
-        const avgErrorB = b[1].totalH / b[1].count;
-        return avgErrorB - avgErrorA; // Descending order (worst first)
+        const failRateA = a[1].hFails / a[1].count;
+        const failRateB = b[1].hFails / b[1].count;
+        return failRateB - failRateA; // Descending order (worst first)
     });
     
     let html = `
@@ -71,18 +71,26 @@ function renderFailTable(stats) {
       <thead>
         <tr>
           <th>Device</th>
-          <th>Avg Horiz Error</th>
-          <th>Avg Vert Error</th>
+          <th>H-Fail Rate</th>
+          <th>V-Fail Rate</th>
+          <th>Primary Tech</th>
         </tr>
       </thead>
       <tbody>`;
 
     for (const [device, data] of sortedDevices) {
+        const hFailRate = ((data.hFails / data.count) * 100).toFixed(1);
+        const vFailRate = ((data.vFails / data.count) * 100).toFixed(1);
+        
+        // Get the most-used technology for this device
+        const primaryTech = Object.entries(data.techMap).sort((a, b) => b[1] - a[1])[0]?.[0] || "Unknown";
+        
         html += `
         <tr>
           <td>${device}</td>
-          <td>${(data.totalH / data.count).toFixed(2)}m</td>
-          <td>${(data.totalV / data.count).toFixed(2)}m</td>
+          <td class="${hFailRate > 20 ? 'text-danger fw-bold' : ''}">${hFailRate}%</td>
+          <td class="${vFailRate > 20 ? 'text-danger fw-bold' : ''}">${vFailRate}%</td>
+          <td><span class="badge">${primaryTech}</span></td>
         </tr>`;
     }
     html += `</tbody></table>`;
