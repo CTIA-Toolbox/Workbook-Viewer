@@ -128,17 +128,6 @@
 
     <section class="grid-card failure-section">
       <div class="grid-toolbar">
-        <div id="hFailureSummary">
-          <strong class="text-danger">Horizontal Failures</strong> 
-          <span class="muted small">(H > 50m)</span>
-        </div>
-      </div>
-      <div id="h-failing-points-list" class="insight-table-wrapper">
-      </div>
-    </section>
-
-    <section class="grid-card failure-section">
-      <div class="grid-toolbar">
         <div id="vFailureSummary">
           <strong class="text-danger">Vertical Failures</strong> 
           <span class="muted small">(V > 5m)</span>
@@ -148,10 +137,21 @@
       </div>
     </section>
 
+    <section class="grid-card failure-section">
+      <div class="grid-toolbar">
+        <div id="hFailureSummary">
+          <strong class="text-danger">Horizontal Failures</strong> 
+          <span class="muted small">(H > 50m)</span>
+        </div>
+      </div>
+      <div id="h-failing-points-list" class="insight-table-wrapper">
+      </div>
+    </section>
+
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v3.8 
+    Building Audit Tool • v3.9 
   </footer>
 
   <script type="module" src="app.js"></script>

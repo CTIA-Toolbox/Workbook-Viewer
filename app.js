@@ -236,7 +236,8 @@ function renderHorizontalFailures(data) {
           <th>Floor</th>
           <th>H-Error</th>
           <th>V-Error</th>
-          <th>Tech used</th>
+          <th>Location Source</th>
+          <th>Location Technology String</th>
         </tr>
       </thead>
       <tbody>`;
@@ -248,7 +249,8 @@ function renderHorizontalFailures(data) {
         <td>${f.floor}</td>
         <td class="text-danger fw-bold">${f.horizontalError.toFixed(1)}m</td>
         <td>${Math.abs(f.verticalError).toFixed(1)}m</td>
-        <td><span class="badge">${f.tech}</span></td>
+        <td>${f.locationSource || 'Unknown'}</td>
+        <td>${f.tech || 'Unknown'}</td>
       </tr>`;
   });
 
@@ -275,7 +277,8 @@ function renderVerticalFailures(data) {
           <th>Floor</th>
           <th>H-Error</th>
           <th>V-Error</th>
-          <th>Tech used</th>
+          <th>Location Source</th>
+          <th>Location Technology String</th>
         </tr>
       </thead>
       <tbody>`;
@@ -287,7 +290,8 @@ function renderVerticalFailures(data) {
         <td>${f.floor}</td>
         <td>${f.horizontalError.toFixed(1)}m</td>
         <td class="text-danger fw-bold">${Math.abs(f.verticalError).toFixed(1)}m</td>
-        <td><span class="badge">${f.tech}</span></td>
+        <td>${f.locationSource || 'Unknown'}</td>
+        <td>${f.tech || 'Unknown'}</td>
       </tr>`;
   });
 
