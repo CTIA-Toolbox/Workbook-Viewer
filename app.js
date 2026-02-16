@@ -56,6 +56,14 @@ function generateInsights(processedRows) {
 
 function renderInsightsTable(stats) {
     const container = document.getElementById('insights-results');
+    
+    // Sort devices by average horizontal error (worst to best)
+    const sortedDevices = Object.entries(stats).sort((a, b) => {
+        const avgErrorA = a[1].totalH / a[1].count;
+        const avgErrorB = b[1].totalH / b[1].count;
+        return avgErrorB - avgErrorA; // Descending order (worst first)
+    });
+    
     let html = `
     <table class="insight-table">
       <thead>
@@ -63,19 +71,16 @@ function renderInsightsTable(stats) {
           <th>Device</th>
           <th>Avg Horiz Error</th>
           <th>Avg Vert Error</th>
-          <th>Reliability (within 50m)</th>
         </tr>
       </thead>
       <tbody>`;
 
-    for (const [device, data] of Object.entries(stats)) {
-        const reliability = ((1 - data.failures / data.count) * 100).toFixed(1);
+    for (const [device, data] of sortedDevices) {
         html += `
         <tr>
           <td>${device}</td>
           <td>${(data.totalH / data.count).toFixed(2)}m</td>
           <td>${(data.totalV / data.count).toFixed(2)}m</td>
-          <td class="${reliability < 90 ? 'text-danger' : 'text-success'}">${reliability}%</td>
         </tr>`;
     }
     html += `</tbody></table>`;
