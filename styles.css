@@ -209,6 +209,32 @@ body {
   white-space: nowrap;
   display: inline-block;
 }
+
+.p80-badge {
+  background: rgba(255,255,255,0.05);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.p80-badge:last-child {
+  margin-bottom: 0;
+}
+
+.p80-badge strong {
+  color: var(--accent);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.p80-cell {
+  vertical-align: top;
+  max-width: 200px;
+}
 .failure-section {
   border-color: rgba(255, 92, 122, 0.3);
   margin-top: 2rem;

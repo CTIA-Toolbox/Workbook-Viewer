@@ -167,8 +167,8 @@ function renderFailTable(stats) {
           <th>H 80%</th>
           <th>V 80%</th>
           <th>Technology Usage</th>
-          <th>Location Source P80</th>
-          <th>Location Tech String P80</th>
+          <th>Location Source<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
+          <th>Technology String<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
         </tr>
       </thead>
       <tbody>`;
@@ -190,18 +190,18 @@ function renderFailTable(stats) {
             .map(([source, errors]) => {
                 const p80H = getPercentile(errors.hErrors, 80);
                 const p80V = getPercentile(errors.vErrors, 80);
-                return `<span class="badge">${source}: H${p80H.toFixed(1)}m V${p80V.toFixed(1)}m</span>`;
+                return `<div class="p80-badge"><strong>${source}</strong><br>H: ${p80H.toFixed(1)}m | V: ${p80V.toFixed(1)}m</div>`;
             })
-            .join(' ');
+            .join('');
         
         // Calculate P80 values for each Location Technology String
         const techStringBreakdown = Object.entries(data.techStringErrorsMap)
             .map(([techStr, errors]) => {
                 const p80H = getPercentile(errors.hErrors, 80);
                 const p80V = getPercentile(errors.vErrors, 80);
-                return `<span class="badge">${techStr}: H${p80H.toFixed(1)}m V${p80V.toFixed(1)}m</span>`;
+                return `<div class="p80-badge"><strong>${techStr}</strong><br>H: ${p80H.toFixed(1)}m | V: ${p80V.toFixed(1)}m</div>`;
             })
-            .join(' ');
+            .join('');
         
         html += `
         <tr>
@@ -209,8 +209,8 @@ function renderFailTable(stats) {
           <td class="${p80H > 50 ? 'text-danger fw-bold' : ''}">${p80H.toFixed(1)}m</td>
           <td class="${p80V > 5 ? 'text-danger fw-bold' : ''}">${p80V.toFixed(1)}m</td>
           <td style="display: flex; flex-wrap: wrap; gap: 4px;">${techBreakdown}</td>
-          <td style="display: flex; flex-wrap: wrap; gap: 4px;">${sourceBreakdown}</td>
-          <td style="display: flex; flex-wrap: wrap; gap: 4px;">${techStringBreakdown}</td>
+          <td class="p80-cell">${sourceBreakdown}</td>
+          <td class="p80-cell">${techStringBreakdown}</td>
         </tr>`;
     }
     html += `</tbody></table>`;
