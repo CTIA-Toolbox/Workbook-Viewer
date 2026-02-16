@@ -220,15 +220,82 @@ function renderFailTable(stats) {
 function renderHorizontalFailures(data) {
   const container = document.getElementById('h-failing-points-list');
   
-  // Filter for horizontal failures (H > 50m)
-  const failures = data.filter(d => d.horizontalError > 50);
+  // Filter for horizontal failures (H > 50m) and sort worst to best
+  const failures = data.filter(d => d.horizontalError > 50)
+    .sort((a, b) => b.horizontalError - a.horizontalError);
   
   if (failures.length === 0) {
     container.innerHTML = '<div class="placeholder success">✅ No horizontal failures detected.</div>';
     return;
   }
 
+  // Calculate breakdown statistics
+  const techMap = {};
+  const sourceErrorsMap = {};
+  const techStringErrorsMap = {};
+  
+  failures.forEach(f => {
+    const tech = f.tech || 'Unknown';
+    const source = f.locationSource || 'Unknown';
+    
+    techMap[tech] = (techMap[tech] || 0) + 1;
+    
+    if (!sourceErrorsMap[source]) {
+      sourceErrorsMap[source] = { hErrors: [], vErrors: [] };
+    }
+    sourceErrorsMap[source].hErrors.push(f.horizontalError || 0);
+    sourceErrorsMap[source].vErrors.push(Math.abs(f.verticalError || 0));
+    
+    if (!techStringErrorsMap[tech]) {
+      techStringErrorsMap[tech] = { hErrors: [], vErrors: [] };
+    }
+    techStringErrorsMap[tech].hErrors.push(f.horizontalError || 0);
+    techStringErrorsMap[tech].vErrors.push(Math.abs(f.verticalError || 0));
+  });
+  
+  // Build breakdown summary
+  const techBreakdown = Object.entries(techMap)
+    .map(([tech, count]) => {
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      return `${tech}: ${percentage}%`;
+    })
+    .join('<br>');
+  
+  const sourceBreakdown = Object.entries(sourceErrorsMap)
+    .map(([source, errors]) => {
+      const count = errors.hErrors.length;
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      const p80H = getPercentile(errors.hErrors, 80);
+      const p80V = getPercentile(errors.vErrors, 80);
+      return `${source}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
+    })
+    .join('<br>');
+  
+  const techStringBreakdown = Object.entries(techStringErrorsMap)
+    .map(([tech, errors]) => {
+      const count = errors.hErrors.length;
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      const p80H = getPercentile(errors.hErrors, 80);
+      const p80V = getPercentile(errors.vErrors, 80);
+      return `${tech}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
+    })
+    .join('<br>');
+  
   let html = `
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; font-size: 12px;">
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Technology Usage</div>
+        <div class="p80-breakdown-cell">${techBreakdown}</div>
+      </div>
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Location Source<br><span style="font-size: 10px; font-weight: 400;">(% and P80 H/V)</span></div>
+        <div class="p80-breakdown-cell">${sourceBreakdown}</div>
+      </div>
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Technology String<br><span style="font-size: 10px; font-weight: 400;">(% and P80 H/V)</span></div>
+        <div class="p80-breakdown-cell">${techStringBreakdown}</div>
+      </div>
+    </div>
     <table class="insight-table">
       <thead>
         <tr>
@@ -261,15 +328,82 @@ function renderHorizontalFailures(data) {
 function renderVerticalFailures(data) {
   const container = document.getElementById('v-failing-points-list');
   
-  // Filter for vertical failures (V > 5m)
-  const failures = data.filter(d => Math.abs(d.verticalError) > 5);
+  // Filter for vertical failures (V > 5m) and sort worst to best
+  const failures = data.filter(d => Math.abs(d.verticalError) > 5)
+    .sort((a, b) => Math.abs(b.verticalError) - Math.abs(a.verticalError));
   
   if (failures.length === 0) {
     container.innerHTML = '<div class="placeholder success">✅ No vertical failures detected.</div>';
     return;
   }
 
+  // Calculate breakdown statistics
+  const techMap = {};
+  const sourceErrorsMap = {};
+  const techStringErrorsMap = {};
+  
+  failures.forEach(f => {
+    const tech = f.tech || 'Unknown';
+    const source = f.locationSource || 'Unknown';
+    
+    techMap[tech] = (techMap[tech] || 0) + 1;
+    
+    if (!sourceErrorsMap[source]) {
+      sourceErrorsMap[source] = { hErrors: [], vErrors: [] };
+    }
+    sourceErrorsMap[source].hErrors.push(f.horizontalError || 0);
+    sourceErrorsMap[source].vErrors.push(Math.abs(f.verticalError || 0));
+    
+    if (!techStringErrorsMap[tech]) {
+      techStringErrorsMap[tech] = { hErrors: [], vErrors: [] };
+    }
+    techStringErrorsMap[tech].hErrors.push(f.horizontalError || 0);
+    techStringErrorsMap[tech].vErrors.push(Math.abs(f.verticalError || 0));
+  });
+  
+  // Build breakdown summary
+  const techBreakdown = Object.entries(techMap)
+    .map(([tech, count]) => {
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      return `${tech}: ${percentage}%`;
+    })
+    .join('<br>');
+  
+  const sourceBreakdown = Object.entries(sourceErrorsMap)
+    .map(([source, errors]) => {
+      const count = errors.hErrors.length;
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      const p80H = getPercentile(errors.hErrors, 80);
+      const p80V = getPercentile(errors.vErrors, 80);
+      return `${source}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
+    })
+    .join('<br>');
+  
+  const techStringBreakdown = Object.entries(techStringErrorsMap)
+    .map(([tech, errors]) => {
+      const count = errors.hErrors.length;
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      const p80H = getPercentile(errors.hErrors, 80);
+      const p80V = getPercentile(errors.vErrors, 80);
+      return `${tech}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
+    })
+    .join('<br>');
+  
   let html = `
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; font-size: 12px;">
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Technology Usage</div>
+        <div class="p80-breakdown-cell">${techBreakdown}</div>
+      </div>
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Location Source<br><span style="font-size: 10px; font-weight: 400;">(% and P80 H/V)</span></div>
+        <div class="p80-breakdown-cell">${sourceBreakdown}</div>
+      </div>
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Technology String<br><span style="font-size: 10px; font-weight: 400;">(% and P80 H/V)</span></div>
+        <div class="p80-breakdown-cell">${techStringBreakdown}</div>
+      </div>
+    </div>
     <table class="insight-table">
       <thead>
         <tr>
