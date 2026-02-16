@@ -468,13 +468,32 @@ function calculateDirectionalBias(processedRows) {
   const latMeters = avgLatDelta * 111000;
   const lonMeters = avgLonDelta * 111000 * Math.cos(avgLat * Math.PI / 180);
   
-  // Calculate magnitude and direction
-  const magnitude = Math.sqrt(latMeters * latMeters + lonMeters * lonMeters);
+  // Calculate horizontal magnitude and direction
+  const horizontalMagnitude = Math.sqrt(latMeters * latMeters + lonMeters * lonMeters);
   
-  // Determine cardinal direction
+  // Calculate vertical bias (using reported altitude - truth altitude)
+  const validAltRows = validRows.filter(d => 
+    d.reportedAlt !== undefined && d.reportedAlt !== null && 
+    d.truthAlt !== undefined && d.truthAlt !== null
+  );
+  
+  let verticalBias = 0;
+  let verticalDisplay = '';
+  
+  if (validAltRows.length > 0) {
+    const avgAltDelta = validAltRows.reduce((sum, d) => sum + (d.reportedAlt - d.truthAlt), 0) / validAltRows.length;
+    verticalBias = avgAltDelta;
+    
+    if (Math.abs(verticalBias) > 0.5) {
+      const arrow = verticalBias > 0 ? '↑' : '↓';
+      verticalDisplay = ` ${arrow}${Math.abs(verticalBias).toFixed(1)}m`;
+    }
+  }
+  
+  // Determine horizontal cardinal direction
   let direction = '';
-  if (magnitude < 1) {
-    return { display: '<small>Minimal</small>', magnitude, direction: 'None' };
+  if (horizontalMagnitude < 1 && Math.abs(verticalBias) < 0.5) {
+    return { display: '<small>Minimal</small>', magnitude: horizontalMagnitude, direction: 'None' };
   }
   
   // North/South component
@@ -489,10 +508,22 @@ function calculateDirectionalBias(processedRows) {
   
   if (!direction) direction = 'Centered';
   
+  // Build display string
+  let displayParts = [];
+  if (horizontalMagnitude >= 1) {
+    displayParts.push(`${horizontalMagnitude.toFixed(1)}m <small>${direction}</small>`);
+  }
+  if (verticalDisplay) {
+    displayParts.push(`<small>${verticalDisplay}</small>`);
+  }
+  
+  const displayString = displayParts.length > 0 ? displayParts.join(' ') : '<small>Minimal</small>';
+  
   return {
-    display: `${magnitude.toFixed(1)}m <small>${direction}</small>`,
-    magnitude,
-    direction
+    display: displayString,
+    magnitude: horizontalMagnitude,
+    direction,
+    verticalBias
   };
 }
 
