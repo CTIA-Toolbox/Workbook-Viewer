@@ -446,10 +446,61 @@ function getPercentile(arr, percentile) {
   return sorted[lower] * (1 - weight) + sorted[upper] * weight;
 }
 
+// Calculate directional bias from location deltas
+function calculateDirectionalBias(processedRows) {
+  // Filter rows that have truth data
+  const validRows = processedRows.filter(d => 
+    d.reportedLat && d.reportedLon && d.truthLat && d.truthLon
+  );
+  
+  if (validRows.length === 0) {
+    return { display: '<small>N/A</small>', magnitude: 0, direction: '' };
+  }
+  
+  // Calculate average deltas in degrees
+  const avgLatDelta = validRows.reduce((sum, d) => sum + (d.reportedLat - d.truthLat), 0) / validRows.length;
+  const avgLonDelta = validRows.reduce((sum, d) => sum + (d.reportedLon - d.truthLon), 0) / validRows.length;
+  
+  // Convert to meters (approximate at mid-latitudes)
+  // 1 degree latitude ≈ 111,000 meters
+  // 1 degree longitude ≈ 111,000 * cos(latitude) meters
+  const avgLat = validRows.reduce((sum, d) => sum + d.truthLat, 0) / validRows.length;
+  const latMeters = avgLatDelta * 111000;
+  const lonMeters = avgLonDelta * 111000 * Math.cos(avgLat * Math.PI / 180);
+  
+  // Calculate magnitude and direction
+  const magnitude = Math.sqrt(latMeters * latMeters + lonMeters * lonMeters);
+  
+  // Determine cardinal direction
+  let direction = '';
+  if (magnitude < 1) {
+    return { display: '<small>Minimal</small>', magnitude, direction: 'None' };
+  }
+  
+  // North/South component
+  if (Math.abs(latMeters) > 0.5) {
+    direction += latMeters > 0 ? 'N' : 'S';
+  }
+  
+  // East/West component
+  if (Math.abs(lonMeters) > 0.5) {
+    direction += lonMeters > 0 ? 'E' : 'W';
+  }
+  
+  if (!direction) direction = 'Centered';
+  
+  return {
+    display: `${magnitude.toFixed(1)}m <small>${direction}</small>`,
+    magnitude,
+    direction
+  };
+}
+
 function updateKPIs(processedRows) {
   if (processedRows.length === 0) {
     document.getElementById('metric-avg-h').textContent = '--';
     document.getElementById('metric-avg-v').textContent = '--';
+    document.getElementById('metric-bias').textContent = '--';
     return;
   }
 
@@ -460,9 +511,13 @@ function updateKPIs(processedRows) {
   const p80H = getPercentile(hErrors, 80);
   const p80V = getPercentile(vErrors, 80);
 
+  // Calculate directional bias
+  const bias = calculateDirectionalBias(processedRows);
+
   // Update UI
   document.getElementById('metric-avg-h').innerHTML = `${p80H.toFixed(1)}m <small>80%</small>`;
   document.getElementById('metric-avg-v').innerHTML = `${p80V.toFixed(1)}m <small>80%</small>`;
+  document.getElementById('metric-bias').innerHTML = bias.display;
 }
 
 function updateStatus(message) {
