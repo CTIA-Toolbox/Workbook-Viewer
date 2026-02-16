@@ -190,18 +190,18 @@ function renderFailTable(stats) {
             .map(([source, errors]) => {
                 const p80H = getPercentile(errors.hErrors, 80);
                 const p80V = getPercentile(errors.vErrors, 80);
-                return `<div class="p80-badge"><strong>${source}</strong><br>H: ${p80H.toFixed(1)}m | V: ${p80V.toFixed(1)}m</div>`;
+                return `<span class="badge">${source}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m</span>`;
             })
-            .join('');
+            .join(' ');
         
         // Calculate P80 values for each Location Technology String
         const techStringBreakdown = Object.entries(data.techStringErrorsMap)
             .map(([techStr, errors]) => {
                 const p80H = getPercentile(errors.hErrors, 80);
                 const p80V = getPercentile(errors.vErrors, 80);
-                return `<div class="p80-badge"><strong>${techStr}</strong><br>H: ${p80H.toFixed(1)}m | V: ${p80V.toFixed(1)}m</div>`;
+                return `<span class="badge">${techStr}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m</span>`;
             })
-            .join('');
+            .join(' ');
         
         html += `
         <tr>
@@ -209,8 +209,8 @@ function renderFailTable(stats) {
           <td class="${p80H > 50 ? 'text-danger fw-bold' : ''}">${p80H.toFixed(1)}m</td>
           <td class="${p80V > 5 ? 'text-danger fw-bold' : ''}">${p80V.toFixed(1)}m</td>
           <td style="display: flex; flex-wrap: wrap; gap: 4px;">${techBreakdown}</td>
-          <td class="p80-cell">${sourceBreakdown}</td>
-          <td class="p80-cell">${techStringBreakdown}</td>
+          <td style="display: flex; flex-wrap: wrap; gap: 4px;">${sourceBreakdown}</td>
+          <td style="display: flex; flex-wrap: wrap; gap: 4px;">${techStringBreakdown}</td>
         </tr>`;
     }
     html += `</tbody></table>`;
