@@ -1,20 +1,22 @@
-// app.js - Insights Logic
-import { loadBuildingData } from './testPointLoader.js';
+// app.js
+import { loadTestPoints } from './testPointLoader.js'; // Changed from loadBuildingData
 import { processCorrelationData } from './correlationReader.js';
 
 let groundTruth = null;
 let allProcessedData = []; // Store globally for filtering
 
 async function init() {
-    const data = await loadBuildingData();
-    if (data) {
-        groundTruth = data.testPoints;
-        // Debug check for the Baro issue
-        console.log("Sheet Check:", { 
-            hasTrends: data.trends.length > 0, 
-            hasLogs: data.logs.length > 0 
-        });
-    }
+  updateStatus('Loading Ground Truth coordinates...');
+  
+  // Call the new function name
+  const data = await loadTestPoints(); 
+  
+  if (data) {
+    groundTruth = data; // 'data' is now the lookup table itself
+    updateStatus(`✓ Ground truth loaded (${Object.keys(groundTruth).length} points). Ready for Audit file.`);
+  } else {
+    updateStatus('⚠ Warning: Could not load TestPoints.xlsx.');
+  }
 }
 
 // 1. New: Populate Floor Filter Dropdown
