@@ -4,6 +4,9 @@ import { processCorrelationData } from './correlationReader.js';
 
 let groundTruth = null;
 let allProcessedData = []; // Store globally for filtering
+let weatherData = []; // Weather tab data for barometric drift detection
+let baroTrendData = []; // Baro Trend data
+let smartInsights = []; // Root cause analysis insights
 
 async function init() {
   updateStatus('Loading Ground Truth coordinates...');
@@ -229,6 +232,11 @@ function renderHorizontalFailures(data) {
     return;
   }
 
+  // Run root cause analysis
+  analyzeRootCauses(data);
+  const wifiDeadZones = detectWiFiDeadZones(failures, data);
+  const wifiDeadZoneMap = new Map(wifiDeadZones.map(w => [w.pointId, w.insight]));
+
   // Calculate breakdown statistics
   const techMap = {};
   const sourceErrorsMap = {};
@@ -310,6 +318,7 @@ function renderHorizontalFailures(data) {
       <tbody>`;
 
   failures.forEach(f => {
+    const wifiInsight = wifiDeadZoneMap.get(f.pointId);
     html += `
       <tr>
         <td>${f.pointId}</td>
@@ -318,6 +327,7 @@ function renderHorizontalFailures(data) {
         <td>${Math.abs(f.verticalError).toFixed(1)}m</td>
         <td>${f.locationSource || 'Unknown'}</td>
         <td>${f.tech || 'Unknown'}</td>
+        <td>${wifiInsight ? '<span style="color: var(--accent); font-size: 11px;">📶 ' + wifiInsight + '</span>' : ''}</td>
       </tr>`;
   });
 
@@ -337,6 +347,10 @@ function renderVerticalFailures(data) {
     return;
   }
 
+  // Detect WiFi dead zones
+  const wifiDeadZones = detectWiFiDeadZones(failures, data);
+  const wifiDeadZoneMap = new Map(wifiDeadZones.map(w => [w.pointId, w.insight]));
+
   // Calculate breakdown statistics
   const techMap = {};
   const sourceErrorsMap = {};
@@ -389,7 +403,9 @@ function renderVerticalFailures(data) {
     })
     .join('<br>');
   
-  let html = `
+  let html = renderSmartInsights();
+  
+  html += `
     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; font-size: 12px;">
       <div>
         <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Technology Usage</div>
@@ -413,11 +429,13 @@ function renderVerticalFailures(data) {
           <th>V-Error</th>
           <th>Location Source</th>
           <th>Location Technology String</th>
+          <th>Insights</th>
         </tr>
       </thead>
       <tbody>`;
 
   failures.forEach(f => {
+    const wifiInsight = wifiDeadZoneMap.get(f.pointId);
     html += `
       <tr>
         <td>${f.pointId}</td>
@@ -426,11 +444,137 @@ function renderVerticalFailures(data) {
         <td class="text-danger fw-bold">${Math.abs(f.verticalError).toFixed(1)}m</td>
         <td>${f.locationSource || 'Unknown'}</td>
         <td>${f.tech || 'Unknown'}</td>
+        <td>${wifiInsight ? '<span style="color: var(--accent); font-size: 11px;">📶 ' + wifiInsight + '</span>' : ''}</td>
       </tr>`;
   });
 
   html += `</tbody></table>`;
   container.innerHTML = html;
+}
+
+// ============================================================================
+// ROOT CAUSE ANALYSIS ENGINE
+// ============================================================================
+
+function analyzeRootCauses(data) {
+  smartInsights = [];
+  
+  // Get current vertical bias from KPI calculation
+  const bias = calculateDirectionalBias(data);
+  const verticalBias = bias.verticalBias !== undefined ? Math.abs(bias.verticalBias) : 0;
+  
+  // 1. BAROMETRIC DRIFT DETECTION
+  if (weatherData.length > 0 && verticalBias > 2) {
+    const pressures = weatherData
+      .map(row => Number(row["Pressure"] || row["Barometric Pressure"] || row["hPa"]))
+      .filter(p => !isNaN(p));
+    
+    if (pressures.length > 1) {
+      const minPressure = Math.min(...pressures);
+      const maxPressure = Math.max(...pressures);
+      const pressureChange = maxPressure - minPressure;
+      
+      if (pressureChange > 1.0) {
+        smartInsights.push({
+          type: 'atmospheric-drift',
+          severity: 'warning',
+          title: 'Atmospheric Drift Detected',
+          description: `Pressure changed by ${pressureChange.toFixed(1)} hPa during test window with ${verticalBias.toFixed(1)}m vertical bias. Check barometric reference sync.`,
+          recommendation: 'Verify all devices are using the same barometric reference station or recalibrate altitude measurements.'
+        });
+      }
+    }
+  }
+  
+  // 2. HARDWARE SENSITIVITY DETECTION
+  const deviceVerticalStats = {};
+  data.forEach(row => {
+    const device = row.device;
+    if (!device) return;
+    
+    if (!deviceVerticalStats[device]) {
+      deviceVerticalStats[device] = [];
+    }
+    deviceVerticalStats[device].push(Math.abs(row.verticalError || 0));
+  });
+  
+  const deviceAvgVertical = {};
+  Object.entries(deviceVerticalStats).forEach(([device, errors]) => {
+    deviceAvgVertical[device] = errors.reduce((sum, e) => sum + e, 0) / errors.length;
+  });
+  
+  const avgValues = Object.values(deviceAvgVertical);
+  if (avgValues.length > 1) {
+    Object.entries(deviceAvgVertical).forEach(([device, avgError]) => {
+      const otherDevicesAvg = avgValues.filter((_, idx) => Object.keys(deviceAvgVertical)[idx] !== device);
+      const otherAvg = otherDevicesAvg.reduce((sum, v) => sum + v, 0) / otherDevicesAvg.length;
+      
+      if (avgError > 3 && otherAvg < 1) {
+        smartInsights.push({
+          type: 'sensor-outlier',
+          severity: 'critical',
+          title: `Sensor Calibration Outlier: ${device}`,
+          description: `${device} shows ${avgError.toFixed(1)}m avg vertical error while other devices average ${otherAvg.toFixed(1)}m.`,
+          recommendation: 'Check device sensor calibration or exclude this device from vertical accuracy analysis.'
+        });
+      }
+    });
+  }
+  
+  return smartInsights;
+}
+
+function detectWiFiDeadZones(failures, allData) {
+  const wifiGaps = [];
+  
+  // Group all data by floor
+  const floorTechMap = {};
+  allData.forEach(row => {
+    const floor = row.floor;
+    if (!floor) return;
+    
+    if (!floorTechMap[floor]) {
+      floorTechMap[floor] = new Set();
+    }
+    if (row.tech) {
+      floorTechMap[floor].add(row.tech.toUpperCase());
+    }
+  });
+  
+  // Check each failure
+  failures.forEach(failure => {
+    const tech = (failure.tech || '').toUpperCase();
+    const floor = failure.floor;
+    
+    if (tech.includes('CELL') && floorTechMap[floor] && floorTechMap[floor].has('WIFI')) {
+      wifiGaps.push({
+        pointId: failure.pointId,
+        floor: floor,
+        insight: 'Probable WiFi Dead Zone'
+      });
+    }
+  });
+  
+  return wifiGaps;
+}
+
+function renderSmartInsights() {
+  if (smartInsights.length === 0) return '';
+  
+  let html = '<div style="background: rgba(79, 140, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 12px; margin-bottom: 16px;">';
+  html += '<div style="font-weight: 600; margin-bottom: 8px; color: var(--accent);">🔍 Smart Insights</div>';
+  
+  smartInsights.forEach(insight => {
+    const icon = insight.severity === 'critical' ? '🔴' : '⚠️';
+    html += `<div style="margin-bottom: 8px; padding: 8px; background: var(--panel); border-radius: 6px;">`;
+    html += `<div style="font-weight: 500; font-size: 13px;">${icon} ${insight.title}</div>`;
+    html += `<div style="font-size: 12px; color: var(--muted); margin-top: 4px;">${insight.description}</div>`;
+    html += `<div style="font-size: 11px; color: var(--accent); margin-top: 4px;">💡 ${insight.recommendation}</div>`;
+    html += `</div>`;
+  });
+  
+  html += '</div>';
+  return html;
 }
 
 // Helper: Calculate Percentile (Excel-compatible with linear interpolation)
@@ -566,14 +710,17 @@ function setupEventHandlers() {
             const arrayBuffer = await file.arrayBuffer();
             const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
             
-            // 1. Extract Baro Data from the UPLOADED workbook
+            // 1. Extract Baro and Weather Data from the UPLOADED workbook
             const trendSheet = workbook.Sheets["Baro Trend"];
-            const baroTrends = trendSheet ? window.XLSX.utils.sheet_to_json(trendSheet) : [];
+            baroTrendData = trendSheet ? window.XLSX.utils.sheet_to_json(trendSheet) : [];
             
             const baroLogSheet = workbook.Sheets["Barometric"];
             const baroLogs = baroLogSheet ? window.XLSX.utils.sheet_to_json(baroLogSheet) : [];
+            
+            const weatherSheet = workbook.Sheets["Weather"];
+            weatherData = weatherSheet ? window.XLSX.utils.sheet_to_json(weatherSheet) : [];
 
-            console.log(`Uploaded File Contents: ${baroTrends.length} Baro Trends, ${baroLogs.length} Baro Logs`);
+            console.log(`Uploaded File Contents: ${baroTrendData.length} Baro Trends, ${baroLogs.length} Baro Logs, ${weatherData.length} Weather Records`);
 
             // 2. Process Correlation (using the static groundTruth loaded during init)
             allProcessedData = processCorrelationData(workbook, groundTruth);
