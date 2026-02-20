@@ -1197,6 +1197,11 @@ function setupEventHandlers() {
 
             // 2. Process Correlation (using the static groundTruth loaded during init)
             allProcessedData = processCorrelationData(workbook, groundTruth);
+                        // Debug: Log first correlation entry to see field names
+                        if (allProcessedData.length > 0) {
+                          console.log('First Correlation entry fields:', Object.keys(allProcessedData[0]));
+                          console.log('First Correlation entry:', allProcessedData[0]);
+                        }
             
             if (allProcessedData.length > 0) {
                 // Populate filters with defaults and apply them
