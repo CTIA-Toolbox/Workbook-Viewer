@@ -9,22 +9,10 @@ export function processCorrelationData(workbook, groundTruth) {
       return [];
     }
 
-    // Convert to JSON, let XLSX auto-detect header row
-    const rows = window.XLSX.utils.sheet_to_json(sheet);
-    if (rows.length > 0) {
-      console.log('Correlation sheet raw first row:', rows[0]);
-      console.log('Correlation sheet raw keys:', Object.keys(rows[0]));
-    }
-    if (rows.length > 0) {
-      console.log('Correlation sheet raw first row:', rows[0]);
-      console.log('Correlation sheet raw keys:', Object.keys(rows[0]));
-    }
+    // Convert to JSON, skipping the header rows if necessary
+    const rows = window.XLSX.utils.sheet_to_json(sheet, { range: 2 }); 
 
     return rows.map(row => {
-            // Debug: Print each mapped row for first entry
-            if (rows.indexOf(row) === 0) {
-              console.log('Mapping Correlation row:', row);
-            }
       const pointId = row["Point ID"] ? String(row["Point ID"]).trim() : null;
       const truth = groundTruth ? groundTruth[pointId] : null;
 
@@ -46,17 +34,17 @@ export function processCorrelationData(workbook, groundTruth) {
         data.truthLat = truth.lat;
         data.truthLon = truth.lon;
         data.truthAlt = truth.alt;
-        
+
         // Calculate Errors
         data.horizontalError = calculateDistance(data.reportedLat, data.reportedLon, truth.lat, truth.lon);
-        
+
         // Use pre-calculated Vertical Error column if available, otherwise calculate as absolute difference
         if (row["Vertical Error"] !== undefined && row["Vertical Error"] !== null) {
           data.verticalError = Math.abs(Number(row["Vertical Error"]));
         } else {
           data.verticalError = Math.abs(data.reportedAlt - truth.alt);
         }
-        
+
         data.isWithinUncertainty = data.horizontalError <= data.uncertaintyH;
       }
 
