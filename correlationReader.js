@@ -9,35 +9,37 @@ export function processCorrelationData(workbook, groundTruth) {
       return [];
     }
 
-    // Convert to JSON, skipping the header rows if necessary
-    const rows = window.XLSX.utils.sheet_to_json(sheet, { range: 2 }); 
+    // Convert to JSON, let XLSX auto-detect header row
+    const rows = window.XLSX.utils.sheet_to_json(sheet);
+    if (rows.length > 0) {
+      console.log('Correlation sheet raw first row:', rows[0]);
+      console.log('Correlation sheet raw keys:', Object.keys(rows[0]));
+    }
+    if (rows.length > 0) {
+      console.log('Correlation sheet raw first row:', rows[0]);
+      console.log('Correlation sheet raw keys:', Object.keys(rows[0]));
+    }
 
     return rows.map(row => {
+            // Debug: Print each mapped row for first entry
+            if (rows.indexOf(row) === 0) {
+              console.log('Mapping Correlation row:', row);
+            }
       const pointId = row["Point ID"] ? String(row["Point ID"]).trim() : null;
       const truth = groundTruth ? groundTruth[pointId] : null;
 
-      // Basic data from the row
-      const data = {
-        pointId: pointId,
-        timestamp: row["Location Fix Time"],
-        device: row["Handset Model Name"],
-        reportedLat: Number(row["Location Latitude"]),
-        reportedLon: Number(row["Location Longitude"]),
-        reportedAlt: Number(row["Location Altitude"]),
-        uncertaintyH: Number(row["Horizontal Uncertainty"]),
-        uncertaintyV: Number(row["Vertical Uncertainty"]),
-        tech: row["Location Technology String"],
-        floor: row["Floor Number"],
-        // Additional filter fields
-        completedCall: row["Completed Call"],
-        correlatedCall: row["Correlated Call"],
-        participant: row["Participant"],
-        carrier: row["Carrier"],
-        locationSource: row["Location Source"],
-        summaryPoolTech: row["Summary Pool Technology"],
-        validHorizontal: row["Valid Horizontal Location"],
-        validVertical: row["Valid Vertical Location"]
-      };
+      // Preserve all columns from the parsed row
+      const data = { ...row };
+      // Add calculated fields for ground truth and errors
+      data.pointId = pointId;
+      data.device = row["Handset Model Name"];
+      data.reportedLat = Number(row["Location Latitude"]);
+      data.reportedLon = Number(row["Location Longitude"]);
+      data.reportedAlt = Number(row["Location Altitude"]);
+      data.uncertaintyH = Number(row["Horizontal Uncertainty"]);
+      data.uncertaintyV = Number(row["Vertical Uncertainty"]);
+      data.tech = row["Location Technology String"];
+      data.floor = row["Floor Number"];
 
       // If we have Ground Truth, calculate the "Insight" metrics
       if (truth) {
