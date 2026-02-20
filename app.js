@@ -180,6 +180,8 @@ function generateInsights(processedRows) {
     stats.count++;
     stats.hErrors.push(row.horizontalError || 0);
     stats.vErrors.push(Math.abs(row.verticalError || 0));
+    stats.rows = stats.rows || [];
+    stats.rows.push(row);
 
     // Track which Tech is being used
     const tech = row.tech || "Unknown";
