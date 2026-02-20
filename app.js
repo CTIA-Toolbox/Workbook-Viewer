@@ -130,8 +130,16 @@ function renderCallPerformance(data) {
         const statusClass = completedCalls === rows.length ? 'risk-pill risk-low' : 'risk-pill risk-high';
         const statusText = completedCalls === rows.length ? 'Completed' : 'Incomplete';
         // Average durations
-        const totalDurations = rows.map(r => safeNumber(r['Call Total Duration'])).filter(v => v !== null);
-        const setupDurations = rows.map(r => safeNumber(r['Call Setup Duration'])).filter(v => v !== null);
+        const totalDurations = rows.map(r => {
+          let val = r['Call Total Duration'];
+          if (typeof val === 'string') val = val.trim();
+          return safeNumber(val);
+        }).filter(v => v !== null);
+        const setupDurations = rows.map(r => {
+          let val = r['Call Setup Duration'];
+          if (typeof val === 'string') val = val.trim();
+          return safeNumber(val);
+        }).filter(v => v !== null);
         const avgTotal = totalDurations.length ? (totalDurations.reduce((a, b) => a + b, 0) / totalDurations.length) : null;
         const avgSetup = setupDurations.length ? (setupDurations.reduce((a, b) => a + b, 0) / setupDurations.length) : null;
         // Carrier: most common
