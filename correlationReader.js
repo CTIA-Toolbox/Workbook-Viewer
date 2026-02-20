@@ -30,9 +30,9 @@ export function processCorrelationData(workbook, groundTruth) {
 
       // Preserve all columns from the parsed row
       const data = { ...row };
-      // Add calculated fields for ground truth and errors
+      // Ensure device field is set for grouping
+      data.device = row["Handset Model Name"] || row["device"] || row["Device"];
       data.pointId = pointId;
-      data.device = row["Handset Model Name"];
       data.reportedLat = Number(row["Location Latitude"]);
       data.reportedLon = Number(row["Location Longitude"]);
       data.reportedAlt = Number(row["Location Altitude"]);
