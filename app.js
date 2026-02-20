@@ -109,57 +109,9 @@ function applyFilters() {
     } else {
       updateStatus(`✓ Loaded ${allProcessedData.length} entries`);
     }
-    renderCallPerformance(filtered);
+    // ...existing code...
 // Call Performance Analysis
-function renderCallPerformance(data) {
-    const container = document.getElementById('call-performance-list');
-    if (!container) return;
-
-    // Sort by Call Total Duration descending
-    const sorted = [...data].sort((a, b) => {
-        const durA = safeNumber(a['Call Total Duration']) || 0;
-        const durB = safeNumber(b['Call Total Duration']) || 0;
-        return durB - durA;
-    });
-
-    let html = `
-    <table class="insight-table">
-      <thead>
-        <tr>
-          <th>Device</th>
-          <th>Point ID</th>
-          <th>Status</th>
-          <th>Total Duration</th>
-          <th>Setup Duration</th>
-          <th>Carrier</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-    sorted.forEach(row => {
-        const device = row.device || 'Unknown';
-        const pointId = row.pointId || '—';
-        const completed = String(row.completedCall).toLowerCase() === 'true';
-        const statusClass = completed ? 'risk-pill risk-low' : 'risk-pill risk-high';
-        const statusText = completed ? 'Completed' : 'Incomplete';
-        const totalDuration = safeNumber(row['Call Total Duration']);
-        const setupDuration = safeNumber(row['Call Setup Duration']);
-        const carrier = row.carrier || '—';
-        const setupClass = setupDuration > 10 ? 'text-danger fw-bold' : '';
-
-        html += `
-        <tr>
-          <td>${device}</td>
-          <td>${pointId}</td>
-          <td><span class="${statusClass}">${statusText}</span></td>
-          <td>${totalDuration !== null ? totalDuration.toFixed(1) + 's' : '—'}</td>
-          <td class="${setupClass}">${setupDuration !== null ? setupDuration.toFixed(1) + 's' : '—'}</td>
-          <td>${carrier}</td>
-        </tr>`;
-    });
-    html += `</tbody></table>`;
-    container.innerHTML = html;
-}
+// ...existing code...
 }
 
 function generateInsights(processedRows) {
