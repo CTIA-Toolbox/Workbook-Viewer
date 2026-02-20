@@ -28,6 +28,9 @@ export function processCorrelationData(workbook, groundTruth) {
       data.uncertaintyV = Number(row["Vertical Uncertainty"]);
       data.tech = row["Location Technology String"];
       data.floor = row["Floor Number"];
+      // Map call setup and total duration fields for Device Performance Insights
+      data.callSetupDuration = row["Call Setup Duration"] || row["Setup Duration"] || row["callSetupDuration"] || row["call_setup_duration"] || null;
+      data.callTotalDuration = row["Call Total Duration"] || row["Total Duration"] || row["callTotalDuration"] || row["call_total_duration"] || null;
 
       // If we have Ground Truth, calculate the "Insight" metrics
       if (truth) {
