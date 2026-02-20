@@ -162,11 +162,11 @@ function generateInsights(processedRows) {
 function renderFailTable(stats) {
     const container = document.getElementById('insights-results');
     
-    // Sort devices by P80 horizontal error (worst to best)
+    // Sort devices by P80 vertical error (worst to best)
     const sortedDevices = Object.entries(stats).sort((a, b) => {
-        const p80A = getPercentile(a[1].hErrors, 80);
-        const p80B = getPercentile(b[1].hErrors, 80);
-        return p80B - p80A; // Descending order (worst first)
+      const p80A = getPercentile(a[1].vErrors, 80);
+      const p80B = getPercentile(b[1].vErrors, 80);
+      return p80B - p80A; // Descending order (worst first)
     });
     
     let html = `
