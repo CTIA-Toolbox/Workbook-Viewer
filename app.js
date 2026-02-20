@@ -16,89 +16,50 @@ let inventoryData = [];
 let carrierSummaryData = [];
 // ELS benchmarking listeners
 document.addEventListener('DOMContentLoaded', () => {
-  const bugreportInput = document.getElementById('bugreport-input');
-  if (bugreportInput) {
-    bugreportInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        bugreportData = parseCsv(evt.target.result);
-        updateELSDashboard();
-      };
-      reader.readAsText(file);
+  const unifiedKpiInput = document.getElementById('unified-kpi-input');
+  if (unifiedKpiInput) {
+    unifiedKpiInput.addEventListener('change', function (e) {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      let kpiProcessed = false;
+      let bugreportProcessed = false;
+      let filesProcessed = 0;
+      files.forEach(file => {
+        const fname = file.name.toLowerCase();
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+          try {
+            const data = evt.target.result;
+            const workbook = window.XLSX.read(data, { type: 'string' });
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: '' });
+            if (fname.includes('unified')) {
+              if (!rows.length || !Object.prototype.hasOwnProperty.call(rows[0], 'Location_Accuracy_Risk_Score_0_100')) {
+                updateStatus('⚠ Invalid unified KPI file. Upload unified_location_kpi_summary.csv.');
+                renderUnifiedKpiStats([]);
+              } else {
+                unifiedKpiRows = rows;
+                renderUnifiedKpiStats(unifiedKpiRows);
+                kpiProcessed = true;
+              }
+            } else if (fname.includes('bugreport')) {
+              bugreportData = rows;
+              bugreportProcessed = true;
+            }
+          } catch (err) {
+            updateStatus('⚠ Error reading file: ' + err.message);
+          }
+          filesProcessed++;
+          if (filesProcessed === files.length) {
+            updateELSDashboard();
+          }
+        };
+        reader.readAsText(file);
+      });
     });
   }
-
-  const inventoryInput = document.getElementById('inventory-input');
-  if (inventoryInput) {
-    inventoryInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        inventoryData = parseCsv(evt.target.result);
-        updateELSDashboard();
-      };
-      reader.readAsText(file);
-    });
-  }
-
-  const carrierSummaryInput = document.getElementById('carrier-summary-input');
-  if (carrierSummaryInput) {
-    carrierSummaryInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    let kpiProcessed = false;
-    let bugreportProcessed = false;
-    let inventoryProcessed = false;
-    for (const file of files) {
-      const fname = file.name.toLowerCase();
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
-      const firstSheetName = workbook.SheetNames[0];
-      const firstSheet = workbook.Sheets[firstSheetName];
-      const rows = window.XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-      if (fname.includes('unified')) {
-        if (!rows.length || !Object.prototype.hasOwnProperty.call(rows[0], 'Location_Accuracy_Risk_Score_0_100')) {
-          updateStatus('⚠ Invalid unified KPI file. Upload unified_location_kpi_summary.csv.');
-          renderUnifiedKpiStats([]);
-          continue;
-        }
-        unifiedKpiRows = rows;
-        renderUnifiedKpiStats(unifiedKpiRows);
-        kpiProcessed = true;
-      } else if (fname.includes('bugreport')) {
-        bugreportData = rows;
-        bugreportProcessed = true;
-      } else if (fname.includes('inventory')) {
-        inventoryData = rows;
-        inventoryProcessed = true;
-      }
-    }
-    updateELSDashboard();
-  // Merge ELS_Type from bugreportData into unifiedKpiRows
-  // Assume bugreportData has fields: device_id, ELS_Type (New/Old)
-  // Assume unifiedKpiRows has device_id or similar
-  const kpiByDevice = {};
-  unifiedKpiRows.forEach(row => {
-    const deviceId = row.device_id || row.Device_Model || row.device || row.Device;
-    if (deviceId) kpiByDevice[deviceId] = row;
-  });
-
-  bugreportData.forEach(bugRow => {
-    const deviceId = bugRow.device_id || bugRow.Device_Model || bugRow.device || bugRow.Device;
-    if (deviceId && kpiByDevice[deviceId]) {
-      kpiByDevice[deviceId].ELS_Type = bugRow.ELS_Type || bugRow.ELS || bugRow.ELS_Type_New_Old;
-    }
-  });
-
-  // Show dashboard if merged
-  document.getElementById('els-comparison-dashboard').style.display = 'block';
-  // (Chart rendering logic can be added here)
-}
+});
 
 async function init() {
   updateStatus('Loading Ground Truth coordinates...');
@@ -788,71 +749,50 @@ function renderSmartInsights() {
     html += `<div style="margin-bottom: 8px; padding: 8px; background: var(--panel); border-radius: 6px;">`;
     html += `<div style="font-weight: 500; font-size: 13px;">${icon} ${insight.title}</div>`;
     html += `<div style="font-size: 12px; color: var(--muted); margin-top: 4px;">${insight.description}</div>`;
-    html += `<div style="font-size: 11px; color: var(--accent); margin-top: 4px;">💡 ${insight.recommendation}</div>`;
-    html += `</div>`;
-  });
-  
-  html += '</div>';
-  return html;
-}
-
-function getRootCause(row, allRows, weatherStats) {
-  const issues = [];
-  
-  // 1. WiFi Dead Zone Detection
-  const tech = (row.tech || '').toUpperCase();
-  const floor = row.floor;
-  if (tech.includes('CELL') && row.horizontalError > 50) {
-    // Check if WiFi is available on this floor
-    const hasWifiOnFloor = allRows.some(r => 
-      r.floor === floor && (r.tech || '').toUpperCase().includes('WIFI')
-    );
-    
-    if (hasWifiOnFloor) {
-      issues.push({ 
-        text: 'WiFi Dead Zone', 
-        class: 'infrastructure' 
-      });
-    }
-  }
-  
-  // 2. Atmospheric Drift Detection
-  // If pressure shift > 1 millibar, tag all points with V-Error > 5m
-  if (weatherStats && weatherStats.pressureShift > 1.0) {
-    if (Math.abs(row.verticalError) > 5) {
-      issues.push({ 
-        text: 'Atmospheric Drift', 
-        class: 'weather' 
-      });
-    }
-  }
-  
-  // 3. Sensor Calibration Issue Detection
-  const deviceModel = row.make;
-  if (deviceModel) {
-    // Calculate average vertical error for this device model
-    const deviceErrors = allRows
-      .filter(r => r.make === deviceModel && r.verticalError !== undefined)
-      .map(r => r.verticalError);
-    
-    if (deviceErrors.length > 0) {
-      const avgDeviceError = deviceErrors.reduce((sum, e) => sum + e, 0) / deviceErrors.length;
-      
-      // If this device model averages >3m and current point is >5m
-      if (avgDeviceError > 3 && row.verticalError > 5) {
-        issues.push({ 
-          text: 'Sensor Calibration', 
-          class: 'hardware' 
+    const unifiedKpiInput = document.getElementById('unified-kpi-input');
+    if (unifiedKpiInput) {
+      unifiedKpiInput.addEventListener('change', function (e) {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+        let kpiProcessed = false;
+        let bugreportProcessed = false;
+        let filesProcessed = 0;
+        files.forEach(file => {
+          const fname = file.name.toLowerCase();
+          const reader = new FileReader();
+          reader.onload = function (evt) {
+            try {
+              const data = evt.target.result;
+              const workbook = window.XLSX.read(data, { type: 'string' });
+              const sheetName = workbook.SheetNames[0];
+              const sheet = workbook.Sheets[sheetName];
+              const rows = window.XLSX.utils.sheet_to_json(sheet, { defval: '' });
+              if (fname.includes('unified')) {
+                if (!rows.length || !Object.prototype.hasOwnProperty.call(rows[0], 'Location_Accuracy_Risk_Score_0_100')) {
+                  updateStatus('⚠ Invalid unified KPI file. Upload unified_location_kpi_summary.csv.');
+                  renderUnifiedKpiStats([]);
+                } else {
+                  unifiedKpiRows = rows;
+                  renderUnifiedKpiStats(unifiedKpiRows);
+                  kpiProcessed = true;
+                }
+              } else if (fname.includes('bugreport')) {
+                bugreportData = rows;
+                bugreportProcessed = true;
+              }
+            } catch (err) {
+              updateStatus('⚠ Error reading file: ' + err.message);
+            }
+            filesProcessed++;
+            if (filesProcessed === files.length) {
+              updateELSDashboard();
+            }
+          };
+          reader.readAsText(file);
         });
-      }
+      });
     }
-  }
-  
-  return issues;
-}
-
-function calculateSyncOffset(locationTimestamp, baroLogs) {
-  // Return null state if no data available
+  });
   if (!locationTimestamp || !baroLogs || baroLogs.length === 0) {
     console.log('Sync Offset Debug: Missing data', { 
       hasTimestamp: !!locationTimestamp, 
