@@ -9,6 +9,7 @@ let baroTrendData = []; // Baro Trend data
 let baroLogData = []; // Barometric tab data for latency check
 let locationGoogleData = []; // Locations Google tab data for latency check
 let smartInsights = []; // Root cause analysis insights
+let unifiedKpiRows = []; // Unified KPI CSV rows
 
 async function init() {
   updateStatus('Loading Ground Truth coordinates...');
@@ -102,13 +103,63 @@ function applyFilters() {
     generateInsights(filtered);
     renderHorizontalFailures(filtered);
     renderVerticalFailures(filtered);
-    
+    renderCallPerformance(filtered);
     // Update status to show filter results
     if (filtered.length < allProcessedData.length) {
-        updateStatus(`✓ Showing ${filtered.length} of ${allProcessedData.length} entries (filtered)`);
+      updateStatus(`✓ Showing ${filtered.length} of ${allProcessedData.length} entries (filtered)`);
     } else {
-        updateStatus(`✓ Loaded ${allProcessedData.length} entries`);
+      updateStatus(`✓ Loaded ${allProcessedData.length} entries`);
     }
+// Call Performance Analysis
+function renderCallPerformance(data) {
+    const container = document.getElementById('call-performance-list');
+    if (!container) return;
+
+    // Sort by Call Total Duration descending
+    const sorted = [...data].sort((a, b) => {
+        const durA = safeNumber(a.callTotalDuration) || 0;
+        const durB = safeNumber(b.callTotalDuration) || 0;
+        return durB - durA;
+    });
+
+    let html = `
+    <table class="insight-table">
+      <thead>
+        <tr>
+          <th>Device</th>
+          <th>Point ID</th>
+          <th>Status</th>
+          <th>Total Duration</th>
+          <th>Setup Duration</th>
+          <th>Carrier</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    sorted.forEach(row => {
+        const device = row.device || 'Unknown';
+        const pointId = row.pointId || '—';
+        const completed = String(row.completedCall).toLowerCase() === 'true';
+        const statusClass = completed ? 'risk-pill risk-low' : 'risk-pill risk-high';
+        const statusText = completed ? 'Completed' : 'Incomplete';
+        const totalDuration = safeNumber(row.callTotalDuration);
+        const setupDuration = safeNumber(row.callSetupDuration);
+        const carrier = row.carrier || '—';
+        const setupClass = setupDuration > 10 ? 'text-danger fw-bold' : '';
+
+        html += `
+        <tr>
+          <td>${device}</td>
+          <td>${pointId}</td>
+          <td><span class="${statusClass}">${statusText}</span></td>
+          <td>${totalDuration !== null ? totalDuration.toFixed(1) + 's' : '—'}</td>
+          <td class="${setupClass}">${setupDuration !== null ? setupDuration.toFixed(1) + 's' : '—'}</td>
+          <td>${carrier}</td>
+        </tr>`;
+    });
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
 }
 
 function generateInsights(processedRows) {
@@ -238,9 +289,30 @@ function renderHorizontalFailures(data) {
   // Get pressure change between first and last test timestamp
   const weatherStats = { pressureShift: 0 };
   
+  // Helper to extract pressure from different field names
+  const getPressure = (d) => {
+    return d['Press. at building alt. (mbar)'] || 
+           d['Pressure (hPa)'] || 
+           d['Barometer Reading (hPa)'] || 
+           d.pressure || 
+           d.Pressure;
+  };
+  
+  // Helper to extract timestamp
+  const getTimestampFromData = (d) => {
+    return d['Time Stamp (UTC)'] || 
+           d['Date/Time (UTC)'] || 
+           d.timestamp || 
+           d.Timestamp;
+  };
+  
   // Combine Weather and Barometric data
   const allPressureData = [...weatherData, ...baroTrendData]
-    .filter(d => d.pressure !== undefined)
+    .map(d => ({
+      pressure: getPressure(d),
+      timestamp: getTimestampFromData(d)
+    }))
+    .filter(d => d.pressure !== undefined && d.timestamp !== undefined)
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   
   if (allPressureData.length >= 2) {
@@ -342,7 +414,7 @@ function renderHorizontalFailures(data) {
       `<span class="insight-tag tag-${rc.class}">${rc.text}</span>`
     ).join(' ');
     
-    const syncResult = calculateSyncOffset(f.timestamp, baroLogData);
+    const syncResult = calculateSyncOffset(f.timestamp, baroTrendData);
     const syncCell = syncResult.tooltip 
       ? `<td class="${syncResult.status}" title="${syncResult.tooltip}">${syncResult.seconds}</td>`
       : `<td class="${syncResult.status}">${syncResult.seconds}</td>`;
@@ -380,9 +452,30 @@ function renderVerticalFailures(data) {
   // Get pressure change between first and last test timestamp
   const weatherStats = { pressureShift: 0 };
   
+  // Helper to extract pressure from different field names
+  const getPressure = (d) => {
+    return d['Press. at building alt. (mbar)'] || 
+           d['Pressure (hPa)'] || 
+           d['Barometer Reading (hPa)'] || 
+           d.pressure || 
+           d.Pressure;
+  };
+  
+  // Helper to extract timestamp
+  const getTimestampFromData = (d) => {
+    return d['Time Stamp (UTC)'] || 
+           d['Date/Time (UTC)'] || 
+           d.timestamp || 
+           d.Timestamp;
+  };
+  
   // Combine Weather and Barometric data
   const allPressureData = [...weatherData, ...baroTrendData]
-    .filter(d => d.pressure !== undefined)
+    .map(d => ({
+      pressure: getPressure(d),
+      timestamp: getTimestampFromData(d)
+    }))
+    .filter(d => d.pressure !== undefined && d.timestamp !== undefined)
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   
   if (allPressureData.length >= 2) {
@@ -485,7 +578,7 @@ function renderVerticalFailures(data) {
       `<span class="insight-tag tag-${rc.class}">${rc.text}</span>`
     ).join(' ');
     
-    const syncResult = calculateSyncOffset(f.timestamp, baroLogData);
+    const syncResult = calculateSyncOffset(f.timestamp, baroTrendData);
     const syncCell = syncResult.tooltip 
       ? `<td class="${syncResult.status}" title="${syncResult.tooltip}">${syncResult.seconds}</td>`
       : `<td class="${syncResult.status}">${syncResult.seconds}</td>`;
@@ -521,7 +614,13 @@ function analyzeRootCauses(data) {
   // 1. BAROMETRIC DRIFT DETECTION
   if (weatherData.length > 0 && verticalBias > 2) {
     const pressures = weatherData
-      .map(row => Number(row["Pressure"] || row["Barometric Pressure"] || row["hPa"]))
+      .map(row => Number(
+        row["Press. at building alt. (mbar)"] || 
+        row["Pressure (hPa)"] || 
+        row["Pressure"] || 
+        row["Barometric Pressure"] || 
+        row["hPa"]
+      ))
       .filter(p => !isNaN(p));
     
     if (pressures.length > 1) {
@@ -699,9 +798,23 @@ function calculateSyncOffset(locationTimestamp, baroLogs) {
   
   const locationTime = new Date(locationTimestamp).getTime();
   
+  if (isNaN(locationTime)) {
+    console.log('Sync Offset Debug: Invalid location timestamp', locationTimestamp);
+    return { seconds: '--', status: '', tooltip: '' };
+  }
+  
   // Helper to get timestamp from baro entry (handle different field names)
   const getBaroTimestamp = (baro) => {
-    return baro.Timestamp || baro.timestamp || baro.Time || baro.time || baro.DateTime || baro.dateTime;
+    return baro['Date/Time (UTC)'] || 
+           baro['Date/Time'] || 
+           baro['Time Stamp (UTC)'] ||
+           baro.Timestamp || 
+           baro.timestamp || 
+           baro.Time || 
+           baro.time || 
+           baro.DateTime || 
+           baro.dateTime ||
+           baro.__EMPTY; // Fallback for unparsed headers
   };
   
   // Find the baro entry closest to the location fix time
@@ -715,6 +828,9 @@ function calculateSyncOffset(locationTimestamp, baroLogs) {
     const currTime = new Date(currTs).getTime();
     const prevTime = new Date(prevTs).getTime();
     
+    if (isNaN(currTime)) return prev;
+    if (isNaN(prevTime)) return curr;
+    
     return (Math.abs(currTime - locationTime) < Math.abs(prevTime - locationTime) ? curr : prev);
   });
   
@@ -726,6 +842,12 @@ function calculateSyncOffset(locationTimestamp, baroLogs) {
   }
   
   const closestBaroTime = new Date(closestBaroTs).getTime();
+  
+  if (isNaN(closestBaroTime)) {
+    console.log('Sync Offset Debug: Invalid baro timestamp', closestBaroTs);
+    return { seconds: '--', status: '', tooltip: '' };
+  }
+  
   const offsetMs = Math.abs(locationTime - closestBaroTime);
   
   // Status based on your concern about the USB daisy-chain
@@ -760,7 +882,16 @@ function checkSystemHealth() {
   
   // Helper to get timestamp from different field names
   const getTimestamp = (obj) => {
-    return obj.Timestamp || obj.timestamp || obj.Time || obj.time || obj.DateTime || obj.dateTime;
+    return obj['Date/Time (UTC)'] || 
+           obj['Date/Time'] || 
+           obj['Time Stamp (UTC)'] ||
+           obj.Timestamp || 
+           obj.timestamp || 
+           obj.Time || 
+           obj.time || 
+           obj.DateTime || 
+           obj.dateTime ||
+           obj.__EMPTY; // Fallback for unparsed headers
   };
   
   // Parse timestamps and calculate delays
@@ -936,6 +1067,113 @@ function updateStatus(message) {
     if (statusEl) statusEl.textContent = message;
 }
 
+function safeNumber(value) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+}
+
+function average(values) {
+    if (!values.length) return null;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function riskBandClass(band) {
+    const normalized = String(band || '').toUpperCase();
+    if (normalized === 'CRITICAL') return 'risk-critical';
+    if (normalized === 'HIGH') return 'risk-high';
+    if (normalized === 'MEDIUM') return 'risk-medium';
+    return 'risk-low';
+}
+
+function renderUnifiedKpiStats(rows) {
+    const totalEl = document.getElementById('unified-kpi-total');
+    const highEl = document.getElementById('unified-kpi-high');
+    const rfEl = document.getElementById('unified-kpi-rf');
+    const riskEl = document.getElementById('unified-kpi-risk');
+    const tableContainer = document.getElementById('unified-kpi-results');
+
+    if (!totalEl || !highEl || !rfEl || !riskEl || !tableContainer) return;
+
+    if (!rows || rows.length === 0) {
+        totalEl.textContent = '--';
+        highEl.textContent = '--';
+        rfEl.textContent = '--';
+        riskEl.textContent = '--';
+        tableContainer.innerHTML = '<div class="placeholder">No unified KPI rows found in this CSV.</div>';
+        return;
+    }
+
+    const normalizedRows = rows.map((row) => ({
+        carrier: row.Carrier || 'Unknown',
+        device: row.Device_Model || 'Unknown',
+        riskScore: safeNumber(row.Location_Accuracy_Risk_Score_0_100),
+        riskBand: String(row.Location_Accuracy_Risk_Band || 'LOW').toUpperCase(),
+        rfDensity: safeNumber(row.RF_Density_Index_0_100),
+        hP80: safeNumber(row.Best_Horizontal_P80_m),
+        vP80: safeNumber(row.Best_Vertical_P80_m),
+        wifiRatio: safeNumber(row.WIFI_Source_Ratio_pct),
+        gpsRatio: safeNumber(row.GPS_Source_Ratio_pct),
+        impact: row.Impact_KPIs || '',
+        gap: row.Data_Gap_Flag || ''
+    }));
+
+    const highRiskCount = normalizedRows.filter(r => r.riskBand === 'HIGH' || r.riskBand === 'CRITICAL').length;
+    const avgRf = average(normalizedRows.map(r => r.rfDensity).filter(v => v !== null));
+    const avgRisk = average(normalizedRows.map(r => r.riskScore).filter(v => v !== null));
+
+    totalEl.textContent = normalizedRows.length;
+    highEl.textContent = `${highRiskCount} (${((highRiskCount / normalizedRows.length) * 100).toFixed(0)}%)`;
+    rfEl.textContent = avgRf !== null ? avgRf.toFixed(1) : '--';
+    riskEl.textContent = avgRisk !== null ? avgRisk.toFixed(1) : '--';
+
+    const sorted = [...normalizedRows].sort((a, b) => (b.riskScore || 0) - (a.riskScore || 0));
+
+    let html = `
+    <table class="insight-table">
+      <thead>
+        <tr>
+          <th>Carrier</th>
+          <th>Device</th>
+          <th>Risk</th>
+          <th>Band</th>
+          <th>RF Density</th>
+          <th>H P80</th>
+          <th>V P80</th>
+          <th>WiFi%</th>
+          <th>GPS%</th>
+          <th>Impact KPIs</th>
+          <th>Data Gap</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    sorted.forEach((row) => {
+        const risk = row.riskScore !== null ? row.riskScore.toFixed(0) : '--';
+        const rf = row.rfDensity !== null ? row.rfDensity.toFixed(1) : '--';
+        const hP80 = row.hP80 !== null ? `${row.hP80.toFixed(1)}m` : '--';
+        const vP80 = row.vP80 !== null ? `${row.vP80.toFixed(1)}m` : '--';
+        const wifi = row.wifiRatio !== null ? `${row.wifiRatio.toFixed(1)}%` : '--';
+        const gps = row.gpsRatio !== null ? `${row.gpsRatio.toFixed(1)}%` : '--';
+        html += `
+        <tr>
+          <td>${row.carrier}</td>
+          <td>${row.device}</td>
+          <td>${risk}</td>
+          <td><span class="risk-pill ${riskBandClass(row.riskBand)}">${row.riskBand}</span></td>
+          <td>${rf}</td>
+          <td>${hP80}</td>
+          <td>${vP80}</td>
+          <td>${wifi}</td>
+          <td>${gps}</td>
+          <td>${row.impact || '--'}</td>
+          <td>${row.gap || '--'}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    tableContainer.innerHTML = html;
+}
+
 function setupEventHandlers() {
     document.getElementById('file-input').addEventListener('change', async (e) => {
         const file = e.target.files[0];
@@ -947,28 +1185,34 @@ function setupEventHandlers() {
             const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
             
             // 1. Extract Baro and Weather Data from the UPLOADED workbook
+            // Use range: 1 to properly parse headers (skip row 0 if needed)
             const trendSheet = workbook.Sheets["Baro Trend"];
-            baroTrendData = trendSheet ? window.XLSX.utils.sheet_to_json(trendSheet) : [];
+            baroTrendData = trendSheet ? window.XLSX.utils.sheet_to_json(trendSheet, { defval: null }) : [];
             
             const baroLogSheet = workbook.Sheets["Barometric"];
-            baroLogData = baroLogSheet ? window.XLSX.utils.sheet_to_json(baroLogSheet) : [];
+            baroLogData = baroLogSheet ? window.XLSX.utils.sheet_to_json(baroLogSheet, { defval: null }) : [];
             
             // Debug: Log first baro entry to see field names
             if (baroLogData.length > 0) {
               console.log('First Barometric entry fields:', Object.keys(baroLogData[0]));
               console.log('First Barometric entry:', baroLogData[0]);
             }
+            if (baroTrendData.length > 0) {
+              console.log('First Baro Trend entry fields:', Object.keys(baroTrendData[0]));
+              console.log('First Baro Trend entry:', baroTrendData[0]);
+            }
             
             const locationGoogleSheet = workbook.Sheets["Locations Google"];
-            locationGoogleData = locationGoogleSheet ? window.XLSX.utils.sheet_to_json(locationGoogleSheet) : [];
+            locationGoogleData = locationGoogleSheet ? window.XLSX.utils.sheet_to_json(locationGoogleSheet, { defval: null }) : [];
             
             // Debug: Log first location entry to see field names
             if (locationGoogleData.length > 0) {
               console.log('First Location Google entry fields:', Object.keys(locationGoogleData[0]));
+              console.log('First Location Google entry:', locationGoogleData[0]);
             }
             
             const weatherSheet = workbook.Sheets["Weather"];
-            weatherData = weatherSheet ? window.XLSX.utils.sheet_to_json(weatherSheet) : [];
+            weatherData = weatherSheet ? window.XLSX.utils.sheet_to_json(weatherSheet, { defval: null }) : [];
 
             console.log(`Uploaded File Contents: ${baroTrendData.length} Baro Trends, ${baroLogData.length} Baro Logs, ${locationGoogleData.length} Location Fixes, ${weatherData.length} Weather Records`);
             
@@ -992,6 +1236,37 @@ function setupEventHandlers() {
             updateStatus('⚠ Error: ' + err.message);
         }
     });
+
+    const unifiedKpiInput = document.getElementById('unified-kpi-input');
+    if (unifiedKpiInput) {
+      unifiedKpiInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        updateStatus('Loading unified KPI CSV...');
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const firstSheet = workbook.Sheets[firstSheetName];
+          const rows = window.XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+          if (!rows.length || !Object.prototype.hasOwnProperty.call(rows[0], 'Location_Accuracy_Risk_Score_0_100')) {
+            updateStatus('⚠ Invalid unified KPI file. Upload unified_location_kpi_summary.csv.');
+            renderUnifiedKpiStats([]);
+            return;
+          }
+
+          unifiedKpiRows = rows;
+          renderUnifiedKpiStats(unifiedKpiRows);
+          updateStatus(`✓ Loaded ${unifiedKpiRows.length} unified KPI rows`);
+        } catch (error) {
+          console.error('Error loading unified KPI CSV:', error);
+          updateStatus('⚠ Error reading unified KPI CSV');
+          renderUnifiedKpiStats([]);
+        }
+      });
+    }
 
     // Filter change handlers - attach to all filter dropdowns
     const filterIds = [
