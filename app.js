@@ -49,41 +49,36 @@ document.addEventListener('DOMContentLoaded', () => {
     carrierSummaryInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        carrierSummaryData = parseCsv(evt.target.result);
-        updateELSDashboard();
-      };
-      reader.readAsText(file);
-    });
-  }
-});
-
-// Simple CSV parser (uses existing logic if available)
-function parseCsv(csvText) {
-  // Use XLSX if available, otherwise fallback to simple split
-  if (window.XLSX) {
-    const workbook = window.XLSX.read(csvText, { type: 'string' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    return window.XLSX.utils.sheet_to_json(sheet, { defval: '' });
-  }
-  // Fallback: naive CSV parsing
-  const lines = csvText.split('\n');
-  const headers = lines[0].split(',');
-  return lines.slice(1).map(line => {
-    const values = line.split(',');
-    const obj = {};
-    headers.forEach((h, i) => { obj[h.trim()] = values[i] ? values[i].trim() : ''; });
-    return obj;
-  });
-}
-
-// ELS Dashboard merging and display
-function updateELSDashboard() {
-  // Only proceed if all required data is loaded
-  if (!bugreportData.length || !unifiedKpiRows.length) return;
-
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    let kpiProcessed = false;
+    let bugreportProcessed = false;
+    let inventoryProcessed = false;
+    for (const file of files) {
+      const fname = file.name.toLowerCase();
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const firstSheet = workbook.Sheets[firstSheetName];
+      const rows = window.XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+      if (fname.includes('unified')) {
+        if (!rows.length || !Object.prototype.hasOwnProperty.call(rows[0], 'Location_Accuracy_Risk_Score_0_100')) {
+          updateStatus('⚠ Invalid unified KPI file. Upload unified_location_kpi_summary.csv.');
+          renderUnifiedKpiStats([]);
+          continue;
+        }
+        unifiedKpiRows = rows;
+        renderUnifiedKpiStats(unifiedKpiRows);
+        kpiProcessed = true;
+      } else if (fname.includes('bugreport')) {
+        bugreportData = rows;
+        bugreportProcessed = true;
+      } else if (fname.includes('inventory')) {
+        inventoryData = rows;
+        inventoryProcessed = true;
+      }
+    }
+    updateELSDashboard();
   // Merge ELS_Type from bugreportData into unifiedKpiRows
   // Assume bugreportData has fields: device_id, ELS_Type (New/Old)
   // Assume unifiedKpiRows has device_id or similar
