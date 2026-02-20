@@ -226,6 +226,7 @@ function renderFailTable(stats) {
         <th>V 80%</th>
         <th>Avg Call Setup</th>
         <th>Avg Call Duration</th>
+        <th>Success Rate</th>
         <th>Technology Usage</th>
         <th>Location Source<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
         <th>Technology String<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
@@ -277,6 +278,10 @@ function renderFailTable(stats) {
         })
         .join('<br>');
 
+      // Calculate success rate
+      const successCount = (data.rows || []).filter(r => String(r['Completed Call']).toUpperCase() === 'TRUE').length;
+      const successRate = data.rows?.length ? ((successCount / data.rows.length) * 100).toFixed(1) + '%' : '—';
+
       html += `
       <tr>
         <td>${device}</td>
@@ -284,6 +289,7 @@ function renderFailTable(stats) {
         <td class="${p80V > 5 ? 'text-danger fw-bold' : ''}">${p80V.toFixed(1)}m</td>
         <td>${avgSetup !== null ? avgSetup.toFixed(1) + 's' : '—'}</td>
         <td>${avgTotal !== null ? avgTotal.toFixed(1) + 's' : '—'}</td>
+        <td>${successRate}</td>
         <td class="p80-breakdown-cell">${techBreakdown}</td>
         <td class="p80-breakdown-cell">${sourceBreakdown}</td>
         <td class="p80-breakdown-cell">${techStringBreakdown}</td>
