@@ -115,46 +115,67 @@ function renderCallPerformance(data) {
     const container = document.getElementById('call-performance-list');
     if (!container) return;
 
-    // Sort by Call Total Duration descending
-    const sorted = [...data].sort((a, b) => {
-        const durA = safeNumber(a.callTotalDuration) || 0;
-        const durB = safeNumber(b.callTotalDuration) || 0;
-        return durB - durA;
+    // Aggregate by device
+    const deviceMap = {};
+    data.forEach(row => {
+        const device = row.device || 'Unknown';
+        if (!deviceMap[device]) deviceMap[device] = { rows: [], device };
+        deviceMap[device].rows.push(row);
     });
+
+    // Build device summary
+    const deviceRows = Object.values(deviceMap).map(({ device, rows }) => {
+        // Status: Completed if all calls completed, else Incomplete
+        const completedCalls = rows.filter(r => String(r.completedCall).toLowerCase() === 'true').length;
+        const statusClass = completedCalls === rows.length ? 'risk-pill risk-low' : 'risk-pill risk-high';
+        const statusText = completedCalls === rows.length ? 'Completed' : 'Incomplete';
+        // Average durations
+        const totalDurations = rows.map(r => safeNumber(r['Call Total Duration'])).filter(v => v !== null);
+        const setupDurations = rows.map(r => safeNumber(r['Call Setup Duration'])).filter(v => v !== null);
+        const avgTotal = totalDurations.length ? (totalDurations.reduce((a, b) => a + b, 0) / totalDurations.length) : null;
+        const avgSetup = setupDurations.length ? (setupDurations.reduce((a, b) => a + b, 0) / setupDurations.length) : null;
+        // Carrier: most common
+        const carrierCounts = {};
+        rows.forEach(r => {
+            const carrier = r.carrier || '—';
+            carrierCounts[carrier] = (carrierCounts[carrier] || 0) + 1;
+        });
+        const carrier = Object.entries(carrierCounts).sort((a, b) => b[1] - a[1])[0][0];
+        return {
+            device,
+            statusClass,
+            statusText,
+            avgTotal,
+            avgSetup,
+            carrier
+        };
+    });
+
+    // Sort by avgTotal descending
+    deviceRows.sort((a, b) => (b.avgTotal || 0) - (a.avgTotal || 0));
 
     let html = `
     <table class="insight-table">
       <thead>
         <tr>
           <th>Device</th>
-          <th>Point ID</th>
           <th>Status</th>
-          <th>Total Duration</th>
-          <th>Setup Duration</th>
+          <th>Avg Total Duration</th>
+          <th>Avg Setup Duration</th>
           <th>Carrier</th>
         </tr>
       </thead>
       <tbody>`;
 
-    sorted.forEach(row => {
-        const device = row.device || 'Unknown';
-        const pointId = row.pointId || '—';
-        const completed = String(row.completedCall).toLowerCase() === 'true';
-        const statusClass = completed ? 'risk-pill risk-low' : 'risk-pill risk-high';
-        const statusText = completed ? 'Completed' : 'Incomplete';
-        const totalDuration = safeNumber(row.callTotalDuration);
-        const setupDuration = safeNumber(row.callSetupDuration);
-        const carrier = row.carrier || '—';
-        const setupClass = setupDuration > 10 ? 'text-danger fw-bold' : '';
-
+    deviceRows.forEach(row => {
+        const setupClass = row.avgSetup > 10 ? 'text-danger fw-bold' : '';
         html += `
         <tr>
-          <td>${device}</td>
-          <td>${pointId}</td>
-          <td><span class="${statusClass}">${statusText}</span></td>
-          <td>${totalDuration !== null ? totalDuration.toFixed(1) + 's' : '—'}</td>
-          <td class="${setupClass}">${setupDuration !== null ? setupDuration.toFixed(1) + 's' : '—'}</td>
-          <td>${carrier}</td>
+          <td>${row.device}</td>
+          <td><span class="${row.statusClass}">${row.statusText}</span></td>
+          <td>${row.avgTotal !== null ? row.avgTotal.toFixed(1) + 's' : '—'}</td>
+          <td class="${setupClass}">${row.avgSetup !== null ? row.avgSetup.toFixed(1) + 's' : '—'}</td>
+          <td>${row.carrier}</td>
         </tr>`;
     });
     html += `</tbody></table>`;
