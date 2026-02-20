@@ -191,12 +191,12 @@ function renderFailTable(stats) {
 
       // Calculate average call setup and duration
       const setupVals = (data.rows || []).map(r => {
-        let val = r['Call Setup Duration'];
+        let val = r.callSetupDuration;
         if (typeof val === 'string') val = val.trim();
         return safeNumber(val);
       }).filter(v => v !== null);
       const totalVals = (data.rows || []).map(r => {
-        let val = r['Call Total Duration'];
+        let val = r.callTotalDuration;
         if (typeof val === 'string') val = val.trim();
         return safeNumber(val);
       }).filter(v => v !== null);
