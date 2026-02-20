@@ -195,12 +195,16 @@ function renderFailTable(stats) {
         if (typeof val === 'string') val = val.trim();
         return safeNumber(val);
       }).filter(v => v !== null);
-      const avgSetup = setupVals.length ? (setupVals.reduce((a, b) => a + b, 0) / setupVals.length) : null;
       const totalVals = (data.rows || []).map(r => {
         let val = r['Call Total Duration'];
         if (typeof val === 'string') val = val.trim();
         return safeNumber(val);
       }).filter(v => v !== null);
+      // Debug log for tracing missing averages
+      console.log(`Device: ${device}`);
+      console.log('setupVals:', setupVals);
+      console.log('totalVals:', totalVals);
+      const avgSetup = setupVals.length ? (setupVals.reduce((a, b) => a + b, 0) / setupVals.length) : null;
       const avgTotal = totalVals.length ? (totalVals.reduce((a, b) => a + b, 0) / totalVals.length) : null;
 
       // Calculate percentage for each technology
