@@ -103,92 +103,12 @@ function applyFilters() {
     generateInsights(filtered);
     renderHorizontalFailures(filtered);
     renderVerticalFailures(filtered);
-    renderCallPerformance(filtered);
     // Update status to show filter results
     if (filtered.length < allProcessedData.length) {
       updateStatus(`✓ Showing ${filtered.length} of ${allProcessedData.length} entries (filtered)`);
     } else {
       updateStatus(`✓ Loaded ${allProcessedData.length} entries`);
     }
-// Call Performance Analysis
-function renderCallPerformance(data) {
-    const container = document.getElementById('call-performance-list');
-    if (!container) return;
-
-    // Aggregate by device
-    const deviceMap = {};
-    data.forEach(row => {
-        const device = row.device || 'Unknown';
-        if (!deviceMap[device]) deviceMap[device] = { rows: [], device };
-        deviceMap[device].rows.push(row);
-    });
-
-    // Build device summary
-    const deviceRows = Object.values(deviceMap).map(({ device, rows }) => {
-        // Status: Completed if all calls completed, else Incomplete
-        const completedCalls = rows.filter(r => String(r.completedCall).toLowerCase() === 'true').length;
-        const statusClass = completedCalls === rows.length ? 'risk-pill risk-low' : 'risk-pill risk-high';
-        const statusText = completedCalls === rows.length ? 'Completed' : 'Incomplete';
-        // Average durations
-        const totalDurations = rows.map(r => {
-          let val = r['Call Total Duration'];
-          if (typeof val === 'string') val = val.trim();
-          return safeNumber(val);
-        }).filter(v => v !== null);
-        const setupDurations = rows.map(r => {
-          let val = r['Call Setup Duration'];
-          if (typeof val === 'string') val = val.trim();
-          return safeNumber(val);
-        }).filter(v => v !== null);
-        const avgTotal = totalDurations.length ? (totalDurations.reduce((a, b) => a + b, 0) / totalDurations.length) : null;
-        const avgSetup = setupDurations.length ? (setupDurations.reduce((a, b) => a + b, 0) / setupDurations.length) : null;
-        // Carrier: most common
-        const carrierCounts = {};
-        rows.forEach(r => {
-            const carrier = r.carrier || '—';
-            carrierCounts[carrier] = (carrierCounts[carrier] || 0) + 1;
-        });
-        const carrier = Object.entries(carrierCounts).sort((a, b) => b[1] - a[1])[0][0];
-        return {
-            device,
-            statusClass,
-            statusText,
-            avgTotal,
-            avgSetup,
-            carrier
-        };
-    });
-
-    // Sort by avgTotal descending
-    deviceRows.sort((a, b) => (b.avgTotal || 0) - (a.avgTotal || 0));
-
-    let html = `
-    <table class="insight-table">
-      <thead>
-        <tr>
-          <th>Device</th>
-          <th>Status</th>
-          <th>Avg Total Duration</th>
-          <th>Avg Setup Duration</th>
-          <th>Carrier</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-    deviceRows.forEach(row => {
-        const setupClass = row.avgSetup > 10 ? 'text-danger fw-bold' : '';
-        html += `
-        <tr>
-          <td>${row.device}</td>
-          <td><span class="${row.statusClass}">${row.statusText}</span></td>
-          <td>${row.avgTotal !== null ? row.avgTotal.toFixed(1) + 's' : '—'}</td>
-          <td class="${setupClass}">${row.avgSetup !== null ? row.avgSetup.toFixed(1) + 's' : '—'}</td>
-          <td>${row.carrier}</td>
-        </tr>`;
-    });
-    html += `</tbody></table>`;
-    container.innerHTML = html;
-}
 }
 
 function generateInsights(processedRows) {
@@ -247,56 +167,74 @@ function renderFailTable(stats) {
     let html = `
     <table class="insight-table">
       <thead>
-        <tr>
-          <th>Device</th>
-          <th>H 80%</th>
-          <th>V 80%</th>
-          <th>Technology Usage</th>
-          <th>Location Source<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
-          <th>Technology String<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
-        </tr>
+      <tr>
+        <th>Device</th>
+        <th>H 80%</th>
+        <th>V 80%</th>
+        <th>Avg Call Setup</th>
+        <th>Avg Call Duration</th>
+        <th>Technology Usage</th>
+        <th>Location Source<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
+        <th>Technology String<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
+      </tr>
       </thead>
       <tbody>`;
 
     for (const [device, data] of sortedDevices) {
-        const p80H = getPercentile(data.hErrors, 80);
-        const p80V = getPercentile(data.vErrors, 80);
-        
-        // Calculate percentage for each technology
-        const techBreakdown = Object.entries(data.techMap)
-            .map(([tech, count]) => {
-                const percentage = ((count / data.count) * 100).toFixed(0);
-                return `${tech}: ${percentage}%`;
-            })
-            .join('<br>');
-        
-        // Calculate P80 values for each Location Source
-        const sourceBreakdown = Object.entries(data.sourceErrorsMap)
-            .map(([source, errors]) => {
-                const p80H = getPercentile(errors.hErrors, 80);
-                const p80V = getPercentile(errors.vErrors, 80);
-                return `${source}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
-            })
-            .join('<br>');
-        
-        // Calculate P80 values for each Location Technology String
-        const techStringBreakdown = Object.entries(data.techStringErrorsMap)
-            .map(([techStr, errors]) => {
-                const p80H = getPercentile(errors.hErrors, 80);
-                const p80V = getPercentile(errors.vErrors, 80);
-                return `${techStr}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
-            })
-            .join('<br>');
-        
-        html += `
-        <tr>
-          <td>${device}</td>
-          <td class="${p80H > 50 ? 'text-danger fw-bold' : ''}">${p80H.toFixed(1)}m</td>
-          <td class="${p80V > 5 ? 'text-danger fw-bold' : ''}">${p80V.toFixed(1)}m</td>
-          <td class="p80-breakdown-cell">${techBreakdown}</td>
-          <td class="p80-breakdown-cell">${sourceBreakdown}</td>
-          <td class="p80-breakdown-cell">${techStringBreakdown}</td>
-        </tr>`;
+      const p80H = getPercentile(data.hErrors, 80);
+      const p80V = getPercentile(data.vErrors, 80);
+
+      // Calculate average call setup and duration
+      const setupVals = (data.rows || []).map(r => {
+        let val = r['Call Setup Duration'];
+        if (typeof val === 'string') val = val.trim();
+        return safeNumber(val);
+      }).filter(v => v !== null);
+      const avgSetup = setupVals.length ? (setupVals.reduce((a, b) => a + b, 0) / setupVals.length) : null;
+      const totalVals = (data.rows || []).map(r => {
+        let val = r['Call Total Duration'];
+        if (typeof val === 'string') val = val.trim();
+        return safeNumber(val);
+      }).filter(v => v !== null);
+      const avgTotal = totalVals.length ? (totalVals.reduce((a, b) => a + b, 0) / totalVals.length) : null;
+
+      // Calculate percentage for each technology
+      const techBreakdown = Object.entries(data.techMap)
+        .map(([tech, count]) => {
+          const percentage = ((count / data.count) * 100).toFixed(0);
+          return `${tech}: ${percentage}%`;
+        })
+        .join('<br>');
+
+      // Calculate P80 values for each Location Source
+      const sourceBreakdown = Object.entries(data.sourceErrorsMap)
+        .map(([source, errors]) => {
+          const p80H = getPercentile(errors.hErrors, 80);
+          const p80V = getPercentile(errors.vErrors, 80);
+          return `${source}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+        })
+        .join('<br>');
+
+      // Calculate P80 values for each Location Technology String
+      const techStringBreakdown = Object.entries(data.techStringErrorsMap)
+        .map(([techStr, errors]) => {
+          const p80H = getPercentile(errors.hErrors, 80);
+          const p80V = getPercentile(errors.vErrors, 80);
+          return `${techStr}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+        })
+        .join('<br>');
+
+      html += `
+      <tr>
+        <td>${device}</td>
+        <td class="${p80H > 50 ? 'text-danger fw-bold' : ''}">${p80H.toFixed(1)}m</td>
+        <td class="${p80V > 5 ? 'text-danger fw-bold' : ''}">${p80V.toFixed(1)}m</td>
+        <td>${avgSetup !== null ? avgSetup.toFixed(1) + 's' : '—'}</td>
+        <td>${avgTotal !== null ? avgTotal.toFixed(1) + 's' : '—'}</td>
+        <td class="p80-breakdown-cell">${techBreakdown}</td>
+        <td class="p80-breakdown-cell">${sourceBreakdown}</td>
+        <td class="p80-breakdown-cell">${techStringBreakdown}</td>
+      </tr>`;
     }
     html += `</tbody></table>`;
     container.innerHTML = html;
