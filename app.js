@@ -4,12 +4,106 @@ import { processCorrelationData } from './correlationReader.js';
 
 let groundTruth = null;
 let allProcessedData = []; // Store globally for filtering
-let weatherData = []; // Weather tab data for barometric drift detection
-let baroTrendData = []; // Baro Trend data
-let baroLogData = []; // Barometric tab data for latency check
-let locationGoogleData = []; // Locations Google tab data for latency check
-let smartInsights = []; // Root cause analysis insights
-let unifiedKpiRows = []; // Unified KPI CSV rows
+let weatherData = [];
+let baroTrendData = [];
+let baroLogData = [];
+let locationGoogleData = [];
+let smartInsights = [];
+let unifiedKpiRows = [];
+// ELS benchmarking global variables
+let bugreportData = [];
+let inventoryData = [];
+let carrierSummaryData = [];
+// ELS benchmarking listeners
+document.addEventListener('DOMContentLoaded', () => {
+  const bugreportInput = document.getElementById('bugreport-input');
+  if (bugreportInput) {
+    bugreportInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        bugreportData = parseCsv(evt.target.result);
+        updateELSDashboard();
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  const inventoryInput = document.getElementById('inventory-input');
+  if (inventoryInput) {
+    inventoryInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        inventoryData = parseCsv(evt.target.result);
+        updateELSDashboard();
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  const carrierSummaryInput = document.getElementById('carrier-summary-input');
+  if (carrierSummaryInput) {
+    carrierSummaryInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        carrierSummaryData = parseCsv(evt.target.result);
+        updateELSDashboard();
+      };
+      reader.readAsText(file);
+    });
+  }
+});
+
+// Simple CSV parser (uses existing logic if available)
+function parseCsv(csvText) {
+  // Use XLSX if available, otherwise fallback to simple split
+  if (window.XLSX) {
+    const workbook = window.XLSX.read(csvText, { type: 'string' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    return window.XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  }
+  // Fallback: naive CSV parsing
+  const lines = csvText.split('\n');
+  const headers = lines[0].split(',');
+  return lines.slice(1).map(line => {
+    const values = line.split(',');
+    const obj = {};
+    headers.forEach((h, i) => { obj[h.trim()] = values[i] ? values[i].trim() : ''; });
+    return obj;
+  });
+}
+
+// ELS Dashboard merging and display
+function updateELSDashboard() {
+  // Only proceed if all required data is loaded
+  if (!bugreportData.length || !unifiedKpiRows.length) return;
+
+  // Merge ELS_Type from bugreportData into unifiedKpiRows
+  // Assume bugreportData has fields: device_id, ELS_Type (New/Old)
+  // Assume unifiedKpiRows has device_id or similar
+  const kpiByDevice = {};
+  unifiedKpiRows.forEach(row => {
+    const deviceId = row.device_id || row.Device_Model || row.device || row.Device;
+    if (deviceId) kpiByDevice[deviceId] = row;
+  });
+
+  bugreportData.forEach(bugRow => {
+    const deviceId = bugRow.device_id || bugRow.Device_Model || bugRow.device || bugRow.Device;
+    if (deviceId && kpiByDevice[deviceId]) {
+      kpiByDevice[deviceId].ELS_Type = bugRow.ELS_Type || bugRow.ELS || bugRow.ELS_Type_New_Old;
+    }
+  });
+
+  // Show dashboard if merged
+  document.getElementById('els-comparison-dashboard').style.display = 'block';
+  // (Chart rendering logic can be added here)
+}
 
 async function init() {
   updateStatus('Loading Ground Truth coordinates...');
