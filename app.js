@@ -86,16 +86,22 @@ function applyFilters() {
     };
 
     const filtered = allProcessedData.filter(d => {
-        if (filters.floor !== 'all' && String(d.floor) !== filters.floor) return false;
-        if (filters.completedCall !== 'all' && String(d.completedCall) !== filters.completedCall) return false;
-        if (filters.correlatedCall !== 'all' && String(d.correlatedCall) !== filters.correlatedCall) return false;
-        if (filters.participant !== 'all' && String(d.participant) !== filters.participant) return false;
-        if (filters.carrier !== 'all' && String(d.carrier) !== filters.carrier) return false;
-        if (filters.locationSource !== 'all' && String(d.locationSource) !== filters.locationSource) return false;
-        if (filters.summaryPoolTech !== 'all' && String(d.summaryPoolTech) !== filters.summaryPoolTech) return false;
-        if (filters.locationTechString !== 'all' && String(d.tech) !== filters.locationTechString) return false;
-        if (filters.validHorizontal !== 'all' && String(d.validHorizontal) !== filters.validHorizontal) return false;
-        if (filters.validVertical !== 'all' && String(d.validVertical) !== filters.validVertical) return false;
+        // Safe comparison helper: handles "TRUE" vs "true" and "all"
+        const matches = (dataVal, filterVal) => {
+            if (filterVal === 'all') return true;
+            return String(dataVal).toLowerCase() === String(filterVal).toLowerCase();
+        };
+
+        if (!matches(d.floor, filters.floor)) return false;
+        if (!matches(d.completedCall, filters.completedCall)) return false;
+        if (!matches(d.correlatedCall, filters.correlatedCall)) return false;
+        if (!matches(d.participant, filters.participant)) return false;
+        if (!matches(d.carrier, filters.carrier)) return false;
+        if (!matches(d.locationSource, filters.locationSource)) return false;
+        if (!matches(d.summaryPoolTech, filters.summaryPoolTech)) return false;
+        if (!matches(d.tech, filters.locationTechString)) return false; // Matches 'tech' from data
+        if (!matches(d.validHorizontal, filters.validHorizontal)) return false;
+        if (!matches(d.validVertical, filters.validVertical)) return false;
         return true;
     });
 
@@ -103,15 +109,12 @@ function applyFilters() {
     generateInsights(filtered);
     renderHorizontalFailures(filtered);
     renderVerticalFailures(filtered);
-    // Update status to show filter results
+    
     if (filtered.length < allProcessedData.length) {
       updateStatus(`✓ Showing ${filtered.length} of ${allProcessedData.length} entries (filtered)`);
     } else {
       updateStatus(`✓ Loaded ${allProcessedData.length} entries`);
     }
-    // ...existing code...
-// Call Performance Analysis
-// ...existing code...
 }
 
 function generateInsights(processedRows) {
@@ -1235,15 +1238,16 @@ function setupEventHandlers() {
 
     // Filter change handlers - attach to all filter dropdowns
     const filterIds = [
-        'filter-floor',
-        'filter-completed-call',
-        'filter-correlated-call',
-        'filter-participant',
-        'filter-carrier',
-        'filter-location-source',
-        'filter-summary-pool-tech',
-        'filter-valid-horizontal',
-        'filter-valid-vertical'
+      'filter-floor',
+      'filter-completed-call',
+      'filter-correlated-call',
+      'filter-participant',
+      'filter-carrier',
+      'filter-location-source',
+      'filter-summary-pool-tech',
+      'filter-location-tech-string', // Add this line here
+      'filter-valid-horizontal',
+      'filter-valid-vertical'
     ];
 
     filterIds.forEach(id => {
