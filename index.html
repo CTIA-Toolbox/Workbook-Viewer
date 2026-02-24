@@ -25,9 +25,6 @@
       </label>
 
       <label class="file">
-        <span class="label">Upload Unified KPI CSV (.csv)</span>
-        <input type="file" id="unified-kpi-input" accept=".csv" />
-      </label>
 
       <div class="view-buttons">
         <button id="btn-export-kml" class="btn" disabled>Export KML Map</button>
@@ -76,10 +73,7 @@
           <select id="filter-completed-call" class="filter-select">
       </select>
 
-    <!-- Move hidden Unified KPI section outside of filter dropdowns -->
-    <section class="grid-card" id="unified-kpi-section" style="display:none;">
-      <!-- Unified Location KPIs section hidden for now. -->
-    </section>
+            <!-- Hidden Unified KPI section, now fully outside filter grid -->
         <label>
           <span class="label">Location Source</span>
           <select id="filter-location-source" class="filter-select">
@@ -182,7 +176,7 @@
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v4.26 
+    Building Audit Tool • v4.27 
   </footer>
 
   <script type="module" src="app.js"></script>
