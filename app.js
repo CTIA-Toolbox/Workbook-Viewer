@@ -82,8 +82,10 @@ function populateFilters(data) {
     populateDropdown('filter-location-source', 'locationSource');
     populateDropdown('filter-summary-pool-tech', 'summaryPoolTech');
     populateDropdown('filter-location-tech-string', 'tech');
-    populateDropdown('filter-valid-horizontal', 'validHorizontal', '', 'TRUE');
-    populateDropdown('filter-valid-vertical', 'validVertical', '', 'TRUE');
+    // Normalize values to uppercase for dropdown population
+    const normalizeBool = val => String(val).toUpperCase();
+    populateDropdown('filter-valid-horizontal', 'validHorizontal', '', 'TRUE', normalizeBool);
+    populateDropdown('filter-valid-vertical', 'validVertical', '', 'TRUE', normalizeBool);
 }
 
 // Apply all active filters
@@ -102,23 +104,27 @@ function applyFilters() {
     };
 
     const filtered = allProcessedData.filter(d => {
-        // Safe comparison helper: handles "TRUE" vs "true" and "all"
-        const matches = (dataVal, filterVal) => {
-            if (filterVal === 'all') return true;
-            return String(dataVal).toLowerCase() === String(filterVal).toLowerCase();
-        };
+      // Safe comparison helper: handles "TRUE" vs "true" and "all"
+      const matches = (dataVal, filterVal, field) => {
+        if (filterVal === 'all') return true;
+        // For Valid Horizontal/Vertical, normalize to uppercase
+        if (field === 'validHorizontal' || field === 'validVertical') {
+          return String(dataVal).toUpperCase() === String(filterVal).toUpperCase();
+        }
+        return String(dataVal).toLowerCase() === String(filterVal).toLowerCase();
+      };
 
-        if (!matches(d.floor, filters.floor)) return false;
-        if (!matches(d.completedCall, filters.completedCall)) return false;
-        if (!matches(d.correlatedCall, filters.correlatedCall)) return false;
-        if (!matches(d.participant, filters.participant)) return false;
-        if (!matches(d.carrier, filters.carrier)) return false;
-        if (!matches(d.locationSource, filters.locationSource)) return false;
-        if (!matches(d.summaryPoolTech, filters.summaryPoolTech)) return false;
-        if (!matches(d.tech, filters.locationTechString)) return false; // Matches 'tech' from data
-        if (!matches(d.validHorizontal, filters.validHorizontal)) return false;
-        if (!matches(d.validVertical, filters.validVertical)) return false;
-        return true;
+      if (!matches(d.floor, filters.floor, 'floor')) return false;
+      if (!matches(d.completedCall, filters.completedCall, 'completedCall')) return false;
+      if (!matches(d.correlatedCall, filters.correlatedCall, 'correlatedCall')) return false;
+      if (!matches(d.participant, filters.participant, 'participant')) return false;
+      if (!matches(d.carrier, filters.carrier, 'carrier')) return false;
+      if (!matches(d.locationSource, filters.locationSource, 'locationSource')) return false;
+      if (!matches(d.summaryPoolTech, filters.summaryPoolTech, 'summaryPoolTech')) return false;
+      if (!matches(d.tech, filters.locationTechString, 'tech')) return false; // Matches 'tech' from data
+      if (!matches(d.validHorizontal, filters.validHorizontal, 'validHorizontal')) return false;
+      if (!matches(d.validVertical, filters.validVertical, 'validVertical')) return false;
+      return true;
     });
 
     updateKPIs(filtered);
@@ -219,42 +225,42 @@ function renderFailTable(stats) {
         if (typeof val === 'string') val = val.trim();
         return safeNumber(val);
       }).filter(v => v !== null);
-      // Debug log for tracing missing averages
-      console.log(`Device: ${device}`);
-      console.log('setupVals:', setupVals);
-      console.log('totalVals:', totalVals);
       const avgSetup = setupVals.length ? (setupVals.reduce((a, b) => a + b, 0) / setupVals.length) : null;
       const avgTotal = totalVals.length ? (totalVals.reduce((a, b) => a + b, 0) / totalVals.length) : null;
 
-      // Calculate percentage for each technology
+      // Normalization helpers
+      const normalize = v => typeof v === 'string' ? v.trim().toUpperCase() : v;
+
+      // Calculate percentage for each technology (normalized, uppercase, trimmed)
       const techBreakdown = Object.entries(data.techMap)
         .map(([tech, count]) => {
           const percentage = ((count / data.count) * 100).toFixed(0);
-          return `${tech}: ${percentage}%`;
+          // Normalize technology usage display
+          return `${typeof tech === 'string' ? tech.trim().toUpperCase() : tech}: ${percentage}%`;
         })
         .join('<br>');
 
-      // Calculate P80 values for each Location Source
+      // Calculate P80 values for each Location Source (normalized)
       const sourceBreakdown = Object.entries(data.sourceErrorsMap)
         .map(([source, errors]) => {
           const p80H = getPercentile(errors.hErrors, 80);
           const p80V = getPercentile(errors.vErrors, 80);
-          return `${source}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+          return `${normalize(source)}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
         })
         .join('<br>');
 
-      // Calculate P80 values for each Location Technology String
+      // Calculate P80 values for each Location Technology String (normalized)
       const techStringBreakdown = Object.entries(data.techStringErrorsMap)
         .map(([techStr, errors]) => {
           const p80H = getPercentile(errors.hErrors, 80);
           const p80V = getPercentile(errors.vErrors, 80);
-          return `${techStr}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+          return `${normalize(techStr)}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
         })
         .join('<br>');
 
       html += `
       <tr>
-        <td>${device}</td>
+        <td>${normalize(device)}</td>
         <td class="${p80H > 50 ? 'text-danger fw-bold' : ''}">${p80H.toFixed(1)}m</td>
         <td class="${p80V > 5 ? 'text-danger fw-bold' : ''}">${p80V.toFixed(1)}m</td>
         <td>${avgSetup !== null ? avgSetup.toFixed(1) + 's' : '—'}</td>
