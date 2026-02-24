@@ -118,6 +118,58 @@
           </div>
         </div>
         <div id="insights-results" class="insight-table-wrapper">
+      <details open>
+        <summary style="font-size:1.1em;font-weight:600;">Data Filters</summary>
+        <section class="grid-card">
+          <div class="grid-toolbar">
+            <div id="gridSummary">
+              <strong>Data Filters</strong>
+            </div>
+          </div>
+          <div style="padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <label>
+              <span class="label">Floor</span>
+              <select id="filter-floor" class="filter-select">
+                <option value="all">All Floors</option>
+              </select>
+            </label>
+            <label>
+              <span class="label">Completed Call</span>
+              <select id="filter-completed-call" class="filter-select"></select>
+            </label>
+            <label>
+              <span class="label">Location Source</span>
+              <select id="filter-location-source" class="filter-select">
+                <option value="all">All</option>
+              </select>
+            </label>
+            <label>
+              <span class="label">Summary Pool Technology</span>
+              <select id="filter-summary-pool-tech" class="filter-select">
+                <option value="all">All</option>
+              </select>
+            </label>
+            <label>
+              <span class="label">Location Technology String</span>
+              <select id="filter-location-tech-string" class="filter-select">
+                <option value="all">All</option>
+              </select>
+            </label>
+            <label>
+              <span class="label">Valid Horizontal</span>
+              <select id="filter-valid-horizontal" class="filter-select">
+                <option value="all">All</option>
+              </select>
+            </label>
+            <label>
+              <span class="label">Valid Vertical</span>
+              <select id="filter-valid-vertical" class="filter-select">
+                <option value="all">All</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      </details>
           <!-- Table header will be rendered by JS, but placeholder should mention call metrics -->
           <div class="placeholder">Upload a file to view building health metrics and device call performance.</div>
         </div>
@@ -176,7 +228,7 @@
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v4.27 
+    Building Audit Tool • v4.28 
   </footer>
 
   <script type="module" src="app.js"></script>
