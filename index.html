@@ -18,55 +18,6 @@
       <p id="status-message" class="muted">Initializing ground truth engine...</p>
     </div>
 
-    <div class="app-controls">
-      <label class="file">
-        <span class="label">Upload Correlation Workbook (.xlsx)</span>
-        <input type="file" id="file-input" accept=".xlsx" />
-      </label>
-
-      <label class="file">
-
-      <div class="view-buttons">
-        <button id="btn-export-kml" class="btn" disabled>Export KML Map</button>
-        <button id="btn-export-csv" class="btn" disabled>Export CSV Summary</button>
-      </div>
-    </div>
-  </header>
-
-  <main class="app-main">
-    
-    <section class="dashboard-grid">
-      <div class="kpi-card">
-        <span class="kpi-label">80% Horizontal (Threshold 50m)</span>
-        <span id="metric-avg-h" class="kpi-value">--</span>
-      </div>
-      
-      <div class="kpi-card">
-        <span class="kpi-label">80% Vertical (Threshold 5m)</span>
-        <span id="metric-avg-v" class="kpi-value">--</span>
-      </div>
-      
-      <div class="kpi-card">
-        <span class="kpi-label">Directional Bias</span>
-        <span id="metric-bias" class="kpi-value">--</span>
-      </div>
-    </section>
-
-    <!-- System Health Alert Banner -->
-    <div id="system-health-alert"></div>
-
-    <section class="grid-card">
-      <div class="grid-toolbar">
-        <div id="gridSummary">
-          <strong>Data Filters</strong>
-        </div>
-      </div>
-      <div style="padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-        <label>
-          <span class="label">Floor</span>
-          <select id="filter-floor" class="filter-select">
-            <option value="all">All Floors</option>
-          </select>
         </label>
         <label>
           <span class="label">Completed Call</span>
@@ -228,7 +179,7 @@
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v4.28 
+    Building Audit Tool • v4.29 
   </footer>
 
   <script type="module" src="app.js"></script>
