@@ -69,6 +69,20 @@
           </div>
         </div>
         <div id="insights-results" class="insight-table-wrapper">
+      <section class="dashboard-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">80% Horizontal (Threshold 50m)</span>
+          <span id="metric-avg-h" class="kpi-value">--</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">80% Vertical (Threshold 5m)</span>
+          <span id="metric-avg-v" class="kpi-value">--</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Directional Bias</span>
+          <span id="metric-bias" class="kpi-value">--</span>
+        </div>
+      </section>
       <details open>
         <summary style="font-size:1.1em;font-weight:600;">Data Filters</summary>
         <section class="grid-card">
@@ -179,7 +193,7 @@
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v4.29 
+    Building Audit Tool • v4.30 
   </footer>
 
   <script type="module" src="app.js"></script>
