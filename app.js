@@ -29,32 +29,48 @@ async function init() {
 function populateFilters(data) {
     // Helper to populate a dropdown
     const populateDropdown = (id, fieldName, labelPrefix = '', defaultValue = null) => {
-        const select = document.getElementById(id);
-        if (!select) return;
-        
-        const values = [...new Set(data.map(d => d[fieldName]).filter(v => v !== undefined && v !== null && v !== ''))];
-        select.innerHTML = '<option value="all">All</option>';
-        
-        values.sort((a, b) => {
-            if (typeof a === 'number' && typeof b === 'number') return a - b;
-            return String(a).localeCompare(String(b));
+      const select = document.getElementById(id);
+      if (!select) return;
+
+      let values = data.map(d => d[fieldName]).filter(v => v !== undefined && v !== null && v !== '');
+
+      // Special normalization for 'filter-location-tech-string': merge case-insensitive duplicates
+      if (id === 'filter-location-tech-string') {
+        // Map to canonical (uppercase) and deduplicate
+        const canonicalMap = {};
+        values.forEach(v => {
+          const upper = String(v).toUpperCase();
+          if (!(upper in canonicalMap)) {
+            canonicalMap[upper] = v; // preserve original casing of first occurrence
+          }
         });
-        
-        values.forEach(val => {
-            const opt = document.createElement('option');
-            opt.value = val;
-            opt.textContent = labelPrefix ? `${labelPrefix} ${val}` : val;
-            select.appendChild(opt);
-        });
-        
-        // Set default value if specified
-        if (defaultValue !== null) {
-            // Try to find exact match (TRUE or true)
-            const matchingValue = values.find(v => String(v).toLowerCase() === String(defaultValue).toLowerCase());
-            if (matchingValue) {
-                select.value = matchingValue;
-            }
+        values = Object.values(canonicalMap);
+      } else {
+        values = [...new Set(values)];
+      }
+
+      select.innerHTML = '<option value="all">All</option>';
+
+      values.sort((a, b) => {
+        if (typeof a === 'number' && typeof b === 'number') return a - b;
+        return String(a).localeCompare(String(b));
+      });
+
+      values.forEach(val => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = labelPrefix ? `${labelPrefix} ${val}` : val;
+        select.appendChild(opt);
+      });
+
+      // Set default value if specified
+      if (defaultValue !== null) {
+        // Try to find exact match (TRUE or true)
+        const matchingValue = values.find(v => String(v).toLowerCase() === String(defaultValue).toLowerCase());
+        if (matchingValue) {
+          select.value = matchingValue;
         }
+      }
     };
 
     // Populate all filters (with defaults for boolean fields)

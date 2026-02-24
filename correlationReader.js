@@ -28,6 +28,14 @@ export function processCorrelationData(workbook, groundTruth) {
       data.uncertaintyV = Number(row["Vertical Uncertainty"]);
       data.tech = row["Location Technology String"];
       data.floor = row["Floor Number"];
+      data.locationSource = row["Location Source"];
+      data.completedCall = row["Completed Call"];
+      data.correlatedCall = row["Correlated Call"];
+      data.validHorizontal = row["Valid Horizontal"];
+      data.validVertical = row["Valid Vertical"];
+      data.summaryPoolTech = row["Summary Pool Technology"];
+      data.carrier = row["Carrier"];
+      data.participant = row["Participant"];
       // Map call setup and total duration fields for Device Performance Insights
       data.callSetupDuration = row["Call Setup Duration"] || row["Setup Duration"] || row["callSetupDuration"] || row["call_setup_duration"] || null;
       data.callTotalDuration = row["Call Total Duration"] || row["Total Duration"] || row["callTotalDuration"] || row["call_total_duration"] || null;
