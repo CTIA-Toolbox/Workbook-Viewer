@@ -74,9 +74,12 @@
         <label>
           <span class="label">Completed Call</span>
           <select id="filter-completed-call" class="filter-select">
-              <section class="grid-card" id="unified-kpi-section" style="display:none;">
-                <!-- Unified Location KPIs section hidden for now. -->
-              </section>
+      </select>
+
+    <!-- Move hidden Unified KPI section outside of filter dropdowns -->
+    <section class="grid-card" id="unified-kpi-section" style="display:none;">
+      <!-- Unified Location KPIs section hidden for now. -->
+    </section>
         <label>
           <span class="label">Location Source</span>
           <select id="filter-location-source" class="filter-select">
@@ -179,7 +182,7 @@
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v4.25 
+    Building Audit Tool • v4.26 
   </footer>
 
   <script type="module" src="app.js"></script>
