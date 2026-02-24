@@ -1277,13 +1277,31 @@ function setupEventHandlers() {
         csvContent += `Total Test Points,${allProcessedData.length}\n`;
         csvContent += "\n";
 
-        // --- Device Performance Insights Section ---
+        // --- Device Performance Insights Section (device-level aggregation) ---
         csvContent += "DEVICE PERFORMANCE INSIGHTS\n";
-        csvContent += "Point ID,Floor,H-Error,V-Error,Location Source,Location Technology String,Insights\n";
+        csvContent += "Device,H 80%,V 80%,Avg Call Setup,Avg Call Duration\n";
+        // Build deviceStats as in generateInsights
+        const deviceStats = {};
         allProcessedData.forEach(row => {
-          const rootCauses = getRootCause(row, allProcessedData, weatherData);
-          const insightTags = rootCauses.map(rc => rc.text).join(' | ');
-          csvContent += `${row.pointId},${row.floor},${row.horizontalError !== undefined ? row.horizontalError.toFixed(1) : ''},${row.verticalError !== undefined ? Math.abs(row.verticalError).toFixed(1) : ''},${row.locationSource || 'Unknown'},${row.tech || 'Unknown'},${insightTags}\n`;
+          if (!deviceStats[row.device]) {
+            deviceStats[row.device] = {
+              hErrors: [],
+              vErrors: [],
+              callSetup: [],
+              callDuration: []
+            };
+          }
+          deviceStats[row.device].hErrors.push(row.horizontalError || 0);
+          deviceStats[row.device].vErrors.push(Math.abs(row.verticalError || 0));
+          if (row.callSetupDuration !== undefined) deviceStats[row.device].callSetup.push(row.callSetupDuration);
+          if (row.callTotalDuration !== undefined) deviceStats[row.device].callDuration.push(row.callTotalDuration);
+        });
+        Object.entries(deviceStats).forEach(([device, stats]) => {
+          const h80 = getPercentile(stats.hErrors, 80).toFixed(1);
+          const v80 = getPercentile(stats.vErrors, 80).toFixed(1);
+          const avgSetup = stats.callSetup.length ? (stats.callSetup.reduce((a,b)=>a+b,0)/stats.callSetup.length).toFixed(1) : '';
+          const avgDuration = stats.callDuration.length ? (stats.callDuration.reduce((a,b)=>a+b,0)/stats.callDuration.length).toFixed(1) : '';
+          csvContent += `${device},${h80},${v80},${avgSetup},${avgDuration}\n`;
         });
         csvContent += "\n";
 
