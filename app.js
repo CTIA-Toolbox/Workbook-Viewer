@@ -231,12 +231,16 @@ function renderFailTable(stats) {
       // Normalization helpers
       const normalize = v => typeof v === 'string' ? v.trim().toUpperCase() : v;
 
-      // Calculate percentage for each technology (normalized, uppercase, trimmed)
-      const techBreakdown = Object.entries(data.techMap)
+      // Combine duplicate technology entries by summing their counts
+      const combinedTechMap = {};
+      Object.entries(data.techMap).forEach(([tech, count]) => {
+        const normTech = normalize(tech);
+        combinedTechMap[normTech] = (combinedTechMap[normTech] || 0) + count;
+      });
+      const techBreakdown = Object.entries(combinedTechMap)
         .map(([tech, count]) => {
           const percentage = ((count / data.count) * 100).toFixed(0);
-          // Normalize technology usage display
-          return `${typeof tech === 'string' ? tech.trim().toUpperCase() : tech}: ${percentage}%`;
+          return `${tech}: ${percentage}%`;
         })
         .join('<br>');
 
