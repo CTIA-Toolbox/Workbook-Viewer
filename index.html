@@ -18,13 +18,83 @@
       <p id="status-message" class="muted">Initializing ground truth engine...</p>
     </div>
 
+    <div class="app-controls">
+      <label class="file">
+        <span class="label">Upload Correlation Workbook (.xlsx)</span>
+        <input type="file" id="file-input" accept=".xlsx" />
+      </label>
+
+      <label class="file">
+        <span class="label">Upload Unified KPI CSV (.csv)</span>
+        <input type="file" id="unified-kpi-input" accept=".csv" />
+      </label>
+
+      <div class="view-buttons">
+        <button id="btn-export-kml" class="btn" disabled>Export KML Map</button>
+        <button id="btn-export-csv" class="btn" disabled>Export CSV Summary</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    
+    <section class="dashboard-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">80% Horizontal (Threshold 50m)</span>
+        <span id="metric-avg-h" class="kpi-value">--</span>
+      </div>
+      
+      <div class="kpi-card">
+        <span class="kpi-label">80% Vertical (Threshold 5m)</span>
+        <span id="metric-avg-v" class="kpi-value">--</span>
+      </div>
+      
+      <div class="kpi-card">
+        <span class="kpi-label">Directional Bias</span>
+        <span id="metric-bias" class="kpi-value">--</span>
+      </div>
+    </section>
+
+    <!-- System Health Alert Banner -->
+    <div id="system-health-alert"></div>
+
+    <section class="grid-card">
+      <div class="grid-toolbar">
+        <div id="gridSummary">
+          <strong>Data Filters</strong>
+        </div>
+      </div>
+      <div style="padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+        <label>
+          <span class="label">Floor</span>
+          <select id="filter-floor" class="filter-select">
+            <option value="all">All Floors</option>
+          </select>
         </label>
         <label>
           <span class="label">Completed Call</span>
           <select id="filter-completed-call" class="filter-select">
-      </select>
-
-            <!-- Hidden Unified KPI section, now fully outside filter grid -->
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Correlated Call</span>
+          <select id="filter-correlated-call" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Participant</span>
+          <select id="filter-participant" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
+        <label>
+          <span class="label">Carrier</span>
+          <select id="filter-carrier" class="filter-select">
+            <option value="all">All</option>
+          </select>
+        </label>
         <label>
           <span class="label">Location Source</span>
           <select id="filter-location-source" class="filter-select">
@@ -59,117 +129,55 @@
     </section>
 
     <section class="grid-card">
-    <details open>
-      <summary style="font-size:1.1em;font-weight:600;">Device Performance Insights</summary>
-      <section class="grid-card">
-        <div class="grid-toolbar">
-          <div id="gridSummary">
-            <strong>Device Performance Insights</strong>
-            <span class="muted small" style="margin-left: 10px;">Grouped by Handset Model</span>
-          </div>
+      <div class="grid-toolbar">
+        <div id="gridSummary">
+          <strong>Device Performance Insights</strong>
+          <span class="muted small" style="margin-left: 10px;">Grouped by Handset Model</span>
         </div>
-        <div id="insights-results" class="insight-table-wrapper">
-      <section class="dashboard-grid">
-        <div class="kpi-card">
-          <span class="kpi-label">80% Horizontal (Threshold 50m)</span>
-          <span id="metric-avg-h" class="kpi-value">--</span>
+      </div>
+
+      <div id="insights-results" class="insight-table-wrapper">
+        <!-- Table header will be rendered by JS, but placeholder should mention call metrics -->
+        <div class="placeholder">Upload a file to view building health metrics and device call performance.</div>
+      </div>
+    </section>
+
+    <section class="grid-card">
+      <div class="grid-toolbar">
+        <div>
+          <strong>Unified Location KPIs</strong>
+          <span class="muted small" style="margin-left: 10px;">ELS + Bugreport merged risk and RF density stats</span>
         </div>
-        <div class="kpi-card">
-          <span class="kpi-label">80% Vertical (Threshold 5m)</span>
-          <span id="metric-avg-v" class="kpi-value">--</span>
+      </div>
+
+      <div class="unified-kpi-summary-grid">
+        <div class="unified-kpi-summary-card">
+          <span class="kpi-label">Devices in File</span>
+          <span id="unified-kpi-total" class="kpi-value unified-kpi-value">--</span>
         </div>
-        <div class="kpi-card">
-          <span class="kpi-label">Directional Bias</span>
-          <span id="metric-bias" class="kpi-value">--</span>
+        <div class="unified-kpi-summary-card">
+          <span class="kpi-label">High/Critical Risk</span>
+          <span id="unified-kpi-high" class="kpi-value unified-kpi-value">--</span>
         </div>
-      </section>
-      <details open>
-        <summary style="font-size:1.1em;font-weight:600;">Data Filters</summary>
-        <section class="grid-card">
-          <div class="grid-toolbar">
-            <div id="gridSummary">
-              <strong>Data Filters</strong>
-            </div>
-          </div>
-          <div style="padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-            <label>
-              <span class="label">Floor</span>
-              <select id="filter-floor" class="filter-select">
-                <option value="all">All Floors</option>
-              </select>
-            </label>
-            <label>
-              <span class="label">Completed Call</span>
-              <select id="filter-completed-call" class="filter-select"></select>
-            </label>
-            <label>
-              <span class="label">Location Source</span>
-              <select id="filter-location-source" class="filter-select">
-                <option value="all">All</option>
-              </select>
-            </label>
-            <label>
-              <span class="label">Summary Pool Technology</span>
-              <select id="filter-summary-pool-tech" class="filter-select">
-                <option value="all">All</option>
-              </select>
-            </label>
-            <label>
-              <span class="label">Location Technology String</span>
-              <select id="filter-location-tech-string" class="filter-select">
-                <option value="all">All</option>
-              </select>
-            </label>
-            <label>
-              <span class="label">Valid Horizontal</span>
-              <select id="filter-valid-horizontal" class="filter-select">
-                <option value="all">All</option>
-              </select>
-            </label>
-            <label>
-              <span class="label">Valid Vertical</span>
-              <select id="filter-valid-vertical" class="filter-select">
-                <option value="all">All</option>
-              </select>
-            </label>
-          </div>
-        </section>
-      </details>
-          <!-- Table header will be rendered by JS, but placeholder should mention call metrics -->
-          <div class="placeholder">Upload a file to view building health metrics and device call performance.</div>
+        <div class="unified-kpi-summary-card">
+          <span class="kpi-label">Avg RF Density</span>
+          <span id="unified-kpi-rf" class="kpi-value unified-kpi-value">--</span>
         </div>
-      </section>
-      <section class="grid-card">
-        <div class="grid-toolbar">
-          <div>
-            <strong>Unified Location KPIs</strong>
-            <span class="muted small" style="margin-left: 10px;">ELS + Bugreport merged risk and RF density stats</span>
-          </div>
+        <div class="unified-kpi-summary-card">
+          <span class="kpi-label">Avg Risk Score</span>
+          <span id="unified-kpi-risk" class="kpi-value unified-kpi-value">--</span>
         </div>
-        <div class="unified-kpi-summary-grid">
-          <div class="unified-kpi-summary-card">
-            <span class="kpi-label">Devices in File</span>
-            <span id="unified-kpi-total" class="kpi-value unified-kpi-value">--</span>
-          </div>
-          <div class="unified-kpi-summary-card">
-            <span class="kpi-label">High/Critical Risk</span>
-            <span id="unified-kpi-high" class="kpi-value unified-kpi-value">--</span>
-          </div>
-          <div class="unified-kpi-summary-card">
-            <span class="kpi-label">Avg RF Density</span>
-            <span id="unified-kpi-rf" class="kpi-value unified-kpi-value">--</span>
-          </div>
-          <div class="unified-kpi-summary-card">
-            <span class="kpi-label">Avg Risk Score</span>
-            <span id="unified-kpi-risk" class="kpi-value unified-kpi-value">--</span>
-          </div>
-        </div>
-        <div id="unified-kpi-results" class="insight-table-wrapper" style="margin: 0 12px 12px;">
-          <div class="placeholder">Upload unified_location_kpi_summary.csv to review merged location-accuracy KPIs.</div>
-        </div>
-      </section>
-      <section class="grid-card failure-section">
-        <div class="grid-toolbar">
+      </div>
+
+      <div id="unified-kpi-results" class="insight-table-wrapper" style="margin: 0 12px 12px;">
+        <div class="placeholder">Upload unified_location_kpi_summary.csv to review merged location-accuracy KPIs.</div>
+      </div>
+    </section>
+
+
+
+    <section class="grid-card failure-section">
+      <div class="grid-toolbar">
         <div id="vFailureSummary">
           <strong class="text-danger">Vertical Failures</strong> 
           <span class="muted small">(V > 5m)</span>
@@ -177,9 +185,10 @@
       </div>
       <div id="v-failing-points-list" class="insight-table-wrapper">
       </div>
-      </section>
-      <section class="grid-card failure-section">
-        <div class="grid-toolbar">
+    </section>
+
+    <section class="grid-card failure-section">
+      <div class="grid-toolbar">
         <div id="hFailureSummary">
           <strong class="text-danger">Horizontal Failures</strong> 
           <span class="muted small">(H > 50m)</span>
@@ -187,13 +196,12 @@
       </div>
       <div id="h-failing-points-list" class="insight-table-wrapper">
       </div>
-      </section>
-    </details>
+    </section>
 
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v4.30 
+    Building Audit Tool • v4.24 
   </footer>
 
   <script type="module" src="app.js"></script>

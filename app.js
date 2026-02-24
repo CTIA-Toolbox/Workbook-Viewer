@@ -378,6 +378,7 @@ function renderHorizontalFailures(data) {
           <th>V-Error</th>
           <th>Location Source</th>
           <th>Location Technology String</th>
+          <th>Sync Offset</th>
           <th>Insights</th>
         </tr>
       </thead>
@@ -388,6 +389,12 @@ function renderHorizontalFailures(data) {
     const insightTags = rootCauses.map(rc => 
       `<span class="insight-tag tag-${rc.class}">${rc.text}</span>`
     ).join(' ');
+    
+    const syncResult = calculateSyncOffset(f.timestamp, baroTrendData);
+    const syncCell = syncResult.tooltip 
+      ? `<td class="${syncResult.status}" title="${syncResult.tooltip}">${syncResult.seconds}</td>`
+      : `<td class="${syncResult.status}">${syncResult.seconds}</td>`;
+    
     html += `
       <tr>
         <td>${f.pointId}</td>
@@ -396,6 +403,7 @@ function renderHorizontalFailures(data) {
         <td>${Math.abs(f.verticalError).toFixed(1)}m</td>
         <td>${f.locationSource || 'Unknown'}</td>
         <td>${f.tech || 'Unknown'}</td>
+        ${syncCell}
         <td>${insightTags}</td>
       </tr>`;
   });
@@ -534,6 +542,7 @@ function renderVerticalFailures(data) {
           <th>V-Error</th>
           <th>Location Source</th>
           <th>Location Technology String</th>
+          <th>Sync Offset</th>
           <th>Insights</th>
         </tr>
       </thead>
@@ -544,6 +553,12 @@ function renderVerticalFailures(data) {
     const insightTags = rootCauses.map(rc => 
       `<span class="insight-tag tag-${rc.class}">${rc.text}</span>`
     ).join(' ');
+    
+    const syncResult = calculateSyncOffset(f.timestamp, baroTrendData);
+    const syncCell = syncResult.tooltip 
+      ? `<td class="${syncResult.status}" title="${syncResult.tooltip}">${syncResult.seconds}</td>`
+      : `<td class="${syncResult.status}">${syncResult.seconds}</td>`;
+    
     html += `
       <tr>
         <td>${f.pointId}</td>
@@ -552,6 +567,7 @@ function renderVerticalFailures(data) {
         <td class="text-danger fw-bold">${Math.abs(f.verticalError).toFixed(1)}m</td>
         <td>${f.locationSource || 'Unknown'}</td>
         <td>${f.tech || 'Unknown'}</td>
+        ${syncCell}
         <td>${insightTags}</td>
       </tr>`;
   });
