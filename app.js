@@ -253,12 +253,21 @@ function renderFailTable(stats) {
         })
         .join('<br>');
 
-      // Calculate P80 values for each Location Technology String (normalized)
-      const techStringBreakdown = Object.entries(data.techStringErrorsMap)
+      // Combine duplicate Technology String entries by averaging their P80 values
+      const combinedTechString = {};
+      Object.entries(data.techStringErrorsMap).forEach(([techStr, errors]) => {
+        const normTechStr = normalize(techStr);
+        if (!combinedTechString[normTechStr]) {
+          combinedTechString[normTechStr] = { hErrors: [], vErrors: [] };
+        }
+        combinedTechString[normTechStr].hErrors.push(...errors.hErrors);
+        combinedTechString[normTechStr].vErrors.push(...errors.vErrors);
+      });
+      const techStringBreakdown = Object.entries(combinedTechString)
         .map(([techStr, errors]) => {
           const p80H = getPercentile(errors.hErrors, 80);
           const p80V = getPercentile(errors.vErrors, 80);
-          return `${normalize(techStr)}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+          return `${techStr}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
         })
         .join('<br>');
 
@@ -1309,7 +1318,7 @@ function setupEventHandlers() {
 
         // --- Device Performance Insights Section (device-level aggregation) ---
         csvContent += "DEVICE PERFORMANCE INSIGHTS\n";
-        csvContent += "Device,H 80%,V 80%,Avg Call Setup,Avg Call Duration\n";
+        csvContent += "Device,H 80%,V 80%,Avg Call Setup,Avg Call Duration,Technology Usage,Technology String Breakdown\n";
         // Build deviceStats as in generateInsights
         const deviceStats = {};
         allProcessedData.forEach(row => {
@@ -1318,20 +1327,44 @@ function setupEventHandlers() {
               hErrors: [],
               vErrors: [],
               callSetup: [],
-              callDuration: []
+              callDuration: [],
+              techMap: {},
+              techStringErrorsMap: {}
             };
           }
           deviceStats[row.device].hErrors.push(row.horizontalError || 0);
           deviceStats[row.device].vErrors.push(Math.abs(row.verticalError || 0));
           if (row.callSetupDuration !== undefined) deviceStats[row.device].callSetup.push(row.callSetupDuration);
           if (row.callTotalDuration !== undefined) deviceStats[row.device].callDuration.push(row.callTotalDuration);
+          // Technology Usage
+          const tech = row.tech || "Unknown";
+          const normTech = typeof tech === 'string' ? tech.trim().toUpperCase() : tech;
+          deviceStats[row.device].techMap[normTech] = (deviceStats[row.device].techMap[normTech] || 0) + 1;
+          // Technology String Breakdown
+          if (!deviceStats[row.device].techStringErrorsMap[normTech]) {
+            deviceStats[row.device].techStringErrorsMap[normTech] = { hErrors: [], vErrors: [] };
+          }
+          deviceStats[row.device].techStringErrorsMap[normTech].hErrors.push(row.horizontalError || 0);
+          deviceStats[row.device].techStringErrorsMap[normTech].vErrors.push(Math.abs(row.verticalError || 0));
         });
         Object.entries(deviceStats).forEach(([device, stats]) => {
           const h80 = getPercentile(stats.hErrors, 80).toFixed(1);
           const v80 = getPercentile(stats.vErrors, 80).toFixed(1);
           const avgSetup = stats.callSetup.length ? (stats.callSetup.reduce((a,b)=>a+b,0)/stats.callSetup.length).toFixed(1) : '';
           const avgDuration = stats.callDuration.length ? (stats.callDuration.reduce((a,b)=>a+b,0)/stats.callDuration.length).toFixed(1) : '';
-          csvContent += `${device},${h80},${v80},${avgSetup},${avgDuration}\n`;
+          // Combine Technology Usage
+          const techUsage = Object.entries(stats.techMap)
+            .map(([tech, count]) => `${tech}: ${((count / stats.hErrors.length) * 100).toFixed(0)}%`)
+            .join(' | ');
+          // Combine Technology String Breakdown
+          const techStringBreakdown = Object.entries(stats.techStringErrorsMap)
+            .map(([techStr, errors]) => {
+              const p80H = getPercentile(errors.hErrors, 80);
+              const p80V = getPercentile(errors.vErrors, 80);
+              return `${techStr}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+            })
+            .join(' | ');
+          csvContent += `${device},${h80},${v80},${avgSetup},${avgDuration},${techUsage},${techStringBreakdown}\n`;
         });
         csvContent += "\n";
 
