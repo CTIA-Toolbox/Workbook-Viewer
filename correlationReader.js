@@ -50,11 +50,9 @@ export function processCorrelationData(workbook, groundTruth) {
         data.horizontalError = calculateDistance(data.reportedLat, data.reportedLon, truth.lat, truth.lon);
 
         // Use pre-calculated Vertical Error column if available, otherwise calculate as absolute difference
-        if (row["Vertical Error"] !== undefined && row["Vertical Error"] !== null) {
-          data.verticalError = Math.abs(Number(row["Vertical Error"]));
-        } else {
-          data.verticalError = Math.abs(data.reportedAlt - truth.alt);
-        }
+
+          // Store raw vertical error value
+          data.vErrorRaw = Number(row["Vertical Error"]) || (data.reportedAlt - truth.alt);
 
         data.isWithinUncertainty = data.horizontalError <= data.uncertaintyH;
       }

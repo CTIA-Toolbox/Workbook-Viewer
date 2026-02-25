@@ -418,7 +418,7 @@ function renderHorizontalFailures(data) {
         <td>${f.pointId}</td>
         <td>${f.floor}</td>
         <td class="text-danger fw-bold">${f.horizontalError.toFixed(1)}m</td>
-        <td>${Math.abs(f.verticalError).toFixed(1)}m</td>
+          <td>${f.vErrorRaw > 0 ? '↑' : '↓'} ${Math.abs(f.vErrorRaw).toFixed(1)}m</td>
         <td>${f.locationSource || 'Unknown'}</td>
         <td>${f.tech || 'Unknown'}</td>
         <td>${insightTags}</td>
