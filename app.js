@@ -1022,18 +1022,17 @@ function calculateDirectionalBias(processedRows) {
   if (!direction) direction = 'Centered';
   
   // Build display string
-  let displayParts = [];
-  if (horizontalMagnitude >= 1) {
-    displayParts.push(`${horizontalMagnitude.toFixed(1)}m <small>${direction}</small>`);
-  }
+  let displayString = '';
   if (verticalDisplay) {
-    displayParts.push(`<small>${verticalDisplay}</small>`);
+    // Make vertical bias primary and prominent
+    displayString += `<span style="font-size:1.2em;font-weight:600;">${verticalDisplay.trim()}</span>`;
   }
-  
-  const displayString = displayParts.length > 0 ? displayParts.join(' ') : '<small>Minimal</small>';
-  
+  if (horizontalMagnitude >= 1) {
+    displayString += ` <span style="font-size:0.9em;">${horizontalMagnitude.toFixed(1)}m <small>${direction}</small></span>`;
+  }
+  if (!displayString) displayString = '<small>Minimal</small>';
   return {
-    display: displayString,
+    display: displayString.trim(),
     magnitude: horizontalMagnitude,
     direction,
     verticalBias
