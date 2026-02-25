@@ -1,7 +1,7 @@
 {
-  "name": "Correlation → KML Tool",
-  "short_name": "Correlation KML",
-  "description": "Convert Excel correlation workbooks to KML. Works offline as a PWA.",
+  "name": "Device Performance Dashboard",
+  "short_name": "Device Dashboard",
+  "description": "Analyze and visualize device performance. Works offline as a PWA.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

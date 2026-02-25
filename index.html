@@ -5,7 +5,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Building Health Audit Dashboard</title>
+  <title>Device Performance Dashboard</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -30,7 +30,7 @@
       </label>
 
       <div class="view-buttons">
-        <button id="btn-export-kml" class="btn" disabled>Export KML Map</button>
+        
         <button id="btn-export-csv" class="btn" disabled>Export CSV Summary</button>
       </div>
     </div>
@@ -149,8 +149,11 @@
 
 
 
-    <section class="grid-card failure-section">
-    <details>
+
+    <!-- Footer with version info -->
+    <footer style="text-align:center; color:#888; font-size:0.95em; margin: 32px 0 12px 0;">
+      Device Performance Tool • v4.34
+    </footer>
       <summary style="font-size:1.1em;font-weight:600;">Vertical Failures</summary>
       <section class="grid-card failure-section">
         <div class="grid-toolbar">
@@ -166,25 +169,3 @@
 
     <section class="grid-card failure-section">
     <details>
-      <summary style="font-size:1.1em;font-weight:600;">Horizontal Failures</summary>
-      <section class="grid-card failure-section">
-        <div class="grid-toolbar">
-          <div id="hFailureSummary">
-            <strong class="text-danger">Horizontal Failures</strong> 
-            <span class="muted small">(H > 50m)</span>
-          </div>
-        </div>
-        <div id="h-failing-points-list" class="insight-table-wrapper">
-        </div>
-      </section>
-    </details>
-
-  </main>
-
-  <footer class="app-footer muted small">
-    Building Audit Tool • v4.33 
-  </footer>
-
-  <script type="module" src="app.js"></script>
-</body>
-</html>

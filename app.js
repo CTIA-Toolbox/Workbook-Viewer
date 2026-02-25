@@ -20,6 +20,9 @@ async function init() {
   if (data) {
     groundTruth = data; // 'data' is now the lookup table itself
     updateStatus(`✓ Ground truth loaded (${Object.keys(groundTruth).length} points). Ready for Audit file.`);
+    // Calculate and display KPIs and insights for all data on initial load
+    updateKPIs(allProcessedData);
+    generateInsights(allProcessedData);
   } else {
     updateStatus('⚠ Warning: Could not load TestPoints.xlsx.');
   }
@@ -271,7 +274,7 @@ function renderFailTable(stats) {
 
 
       // Normalize and combine Technology String keys to uppercase
-      const normalizedTechStringErrorsMap = {};
+      // Use outer normalizedTechStringErrorsMap
       Object.entries(data.techStringErrorsMap).forEach(([techStr, errors]) => {
         const key = techStr.toUpperCase();
         if (!normalizedTechStringErrorsMap[key]) {
@@ -322,8 +325,7 @@ function renderHorizontalFailures(data) {
   
   // Helper to extract pressure from different field names
   const getPressure = (d) => {
-    return d['Press. at building alt. (mbar)'] || 
-           d['Pressure (hPa)'] || 
+            // Removed Horizontal and Vertical Failures sections
            d['Barometer Reading (hPa)'] || 
            d.pressure || 
            d.Pressure;
@@ -382,7 +384,7 @@ function renderHorizontalFailures(data) {
   });
   
   // Build breakdown summary
-  // Normalize and combine technology keys to uppercase
+  // Normalize and combine technology keys to uppercase for Technology Usage
   const normalizedTechMap = {};
   Object.entries(techMap).forEach(([tech, count]) => {
     const key = tech.toUpperCase();
@@ -394,6 +396,17 @@ function renderHorizontalFailures(data) {
       return `${tech}: ${percentage}%`;
     })
     .join('<br>');
+
+  // Normalize and combine Technology String keys to uppercase
+  Object.entries(techStringErrorsMap).forEach(([tech, errors]) => {
+    const key = tech.toUpperCase();
+    if (!normalizedTechStringErrorsMap[key]) {
+      normalizedTechStringErrorsMap[key] = { hErrors: [], vErrors: [] };
+    }
+    normalizedTechStringErrorsMap[key].hErrors.push(...errors.hErrors);
+    normalizedTechStringErrorsMap[key].vErrors.push(...errors.vErrors);
+  });
+      // Use outer techStringBreakdown
   
   // Normalize and combine Location Source keys to uppercase
   const normalizedSourceErrorsMap = {};
