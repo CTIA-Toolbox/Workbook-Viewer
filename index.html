@@ -149,40 +149,44 @@
 
 
 
-    <section class="grid-card failure-section">
-    <details>
-      <summary style="font-size:1.1em;font-weight:600;">Vertical Failures</summary>
-      <section class="grid-card failure-section">
-        <div class="grid-toolbar">
-          <div id="vFailureSummary">
-            <strong class="text-danger">Vertical Failures</strong> 
-            <span class="muted small">(V > 5m)</span>
-          </div>
-        </div>
-        <div id="vertical-failures-list" class="insight-table-wrapper">
-        </div>
+    <div class="failures-container-row" style="display: flex; gap: 20px; margin-top: 20px;">
+      <section class="grid-card failure-section" style="flex: 1;">
+        <details open>
+          <summary style="font-size:1.1em;font-weight:600;">Vertical Failures</summary>
+          <section class="grid-card failure-section">
+            <div class="grid-toolbar">
+              <div id="vFailureSummary">
+                <strong class="text-danger">Vertical Failures</strong> 
+                <span class="muted small">(V > 5m)</span>
+              </div>
+            </div>
+            <div id="vertical-failures-list" class="insight-table-wrapper">
+            </div>
+          </section>
+        </details>
       </section>
-    </details>
 
-    <section class="grid-card failure-section">
-    <details>
-      <summary style="font-size:1.1em;font-weight:600;">Horizontal Failures</summary>
-      <section class="grid-card failure-section">
-        <div class="grid-toolbar">
-          <div id="hFailureSummary">
-            <strong class="text-danger">Horizontal Failures</strong> 
-            <span class="muted small">(H > 50m)</span>
-          </div>
-        </div>
-        <div id="h-failing-points-list" class="insight-table-wrapper">
-        </div>
+      <section class="grid-card failure-section" style="flex: 1;">
+        <details open>
+          <summary style="font-size:1.1em;font-weight:600;">Horizontal Failures</summary>
+          <section class="grid-card failure-section">
+            <div class="grid-toolbar">
+              <div id="hFailureSummary">
+                <strong class="text-danger">Horizontal Failures</strong> 
+                <span class="muted small">(H > 50m)</span>
+              </div>
+            </div>
+            <div id="h-failing-points-list" class="insight-table-wrapper">
+            </div>
+          </section>
+        </details>
       </section>
-    </details>
+    </div>
 
   </main>
 
   <footer class="app-footer muted small">
-    Building Audit Tool • v4.38 
+    Building Audit Tool • v4.39 
   </footer>
 
   <script type="module" src="app.js"></script>
