@@ -161,10 +161,6 @@ function renderVerticalFailures(data) {
 }
 
 // --- HELPER FUNCTIONS ---
-function updateStatus(msg) {
-    const el = document.getElementById('status-message');
-    if (el) el.textContent = msg;
-}
 
 // Initialize the app
 init();
