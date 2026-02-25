@@ -347,9 +347,10 @@ function renderHorizontalFailures(data) {
   
   failures.forEach(f => {
     const tech = f.tech || 'Unknown';
+    const normTech = typeof tech === 'string' ? tech.trim().toUpperCase() : tech;
     const source = f.locationSource || 'Unknown';
     
-    techMap[tech] = (techMap[tech] || 0) + 1;
+    techMap[normTech] = (techMap[normTech] || 0) + 1;
     
     if (!sourceErrorsMap[source]) {
       sourceErrorsMap[source] = { hErrors: [], vErrors: [] };
@@ -357,11 +358,11 @@ function renderHorizontalFailures(data) {
     sourceErrorsMap[source].hErrors.push(f.horizontalError || 0);
     sourceErrorsMap[source].vErrors.push(Math.abs(f.verticalError || 0));
     
-    if (!techStringErrorsMap[tech]) {
-      techStringErrorsMap[tech] = { hErrors: [], vErrors: [] };
+    if (!techStringErrorsMap[normTech]) {
+      techStringErrorsMap[normTech] = { hErrors: [], vErrors: [] };
     }
-    techStringErrorsMap[tech].hErrors.push(f.horizontalError || 0);
-    techStringErrorsMap[tech].vErrors.push(Math.abs(f.verticalError || 0));
+    techStringErrorsMap[normTech].hErrors.push(f.horizontalError || 0);
+    techStringErrorsMap[normTech].vErrors.push(Math.abs(f.verticalError || 0));
   });
   
   // Build breakdown summary
@@ -371,7 +372,7 @@ function renderHorizontalFailures(data) {
       return `${tech}: ${percentage}%`;
     })
     .join('<br>');
-  
+
   const sourceBreakdown = Object.entries(sourceErrorsMap)
     .map(([source, errors]) => {
       const count = errors.hErrors.length;
@@ -381,7 +382,8 @@ function renderHorizontalFailures(data) {
       return `${source}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
     })
     .join('<br>');
-  
+
+  // Combine duplicate Technology String entries by averaging their P80 values
   const techStringBreakdown = Object.entries(techStringErrorsMap)
     .map(([tech, errors]) => {
       const count = errors.hErrors.length;
@@ -501,9 +503,10 @@ function renderVerticalFailures(data) {
   
   failures.forEach(f => {
     const tech = f.tech || 'Unknown';
+    const normTech = typeof tech === 'string' ? tech.trim().toUpperCase() : tech;
     const source = f.locationSource || 'Unknown';
     
-    techMap[tech] = (techMap[tech] || 0) + 1;
+    techMap[normTech] = (techMap[normTech] || 0) + 1;
     
     if (!sourceErrorsMap[source]) {
       sourceErrorsMap[source] = { hErrors: [], vErrors: [] };
@@ -511,11 +514,11 @@ function renderVerticalFailures(data) {
     sourceErrorsMap[source].hErrors.push(f.horizontalError || 0);
     sourceErrorsMap[source].vErrors.push(Math.abs(f.verticalError || 0));
     
-    if (!techStringErrorsMap[tech]) {
-      techStringErrorsMap[tech] = { hErrors: [], vErrors: [] };
+    if (!techStringErrorsMap[normTech]) {
+      techStringErrorsMap[normTech] = { hErrors: [], vErrors: [] };
     }
-    techStringErrorsMap[tech].hErrors.push(f.horizontalError || 0);
-    techStringErrorsMap[tech].vErrors.push(Math.abs(f.verticalError || 0));
+    techStringErrorsMap[normTech].hErrors.push(f.horizontalError || 0);
+    techStringErrorsMap[normTech].vErrors.push(Math.abs(f.verticalError || 0));
   });
   
   // Build breakdown summary
@@ -525,7 +528,7 @@ function renderVerticalFailures(data) {
       return `${tech}: ${percentage}%`;
     })
     .join('<br>');
-  
+
   const sourceBreakdown = Object.entries(sourceErrorsMap)
     .map(([source, errors]) => {
       const count = errors.hErrors.length;
@@ -535,7 +538,8 @@ function renderVerticalFailures(data) {
       return `${source}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
     })
     .join('<br>');
-  
+
+  // Combine duplicate Technology String entries by averaging their P80 values
   const techStringBreakdown = Object.entries(techStringErrorsMap)
     .map(([tech, errors]) => {
       const count = errors.hErrors.length;
@@ -1370,21 +1374,53 @@ function setupEventHandlers() {
 
         // --- Vertical Failures Section ---
         csvContent += "VERTICAL FAILURES\n";
-        csvContent += "Point ID,Floor,H-Error,V-Error,Location Source,Location Technology String,Insights\n";
+        csvContent += "Point ID,Floor,H-Error,V-Error,Location Source,Technology Usage,Technology String,Insights\n";
         allProcessedData.filter(row => Math.abs(row.verticalError) > 5).forEach(row => {
           const rootCauses = getRootCause(row, allProcessedData, weatherData);
           const insightTags = rootCauses.map(rc => rc.text).join(' | ');
-          csvContent += `${row.pointId},${row.floor},${row.horizontalError !== undefined ? row.horizontalError.toFixed(1) : ''},${row.verticalError !== undefined ? Math.abs(row.verticalError).toFixed(1) : ''},${row.locationSource || 'Unknown'},${row.tech || 'Unknown'},${insightTags}\n`;
+          // Normalize and deduplicate Technology Usage
+          const tech = row.tech || 'Unknown';
+          const normTech = typeof tech === 'string' ? tech.trim().toUpperCase() : tech;
+          // Technology String breakdown (combine errors for like tech)
+          let techStringBreakdown = '';
+          if (row.device) {
+            // Find all rows for this device and tech
+            const deviceRows = allProcessedData.filter(r => r.device === row.device && (typeof r.tech === 'string' ? r.tech.trim().toUpperCase() : r.tech) === normTech);
+            const hErrors = deviceRows.map(r => r.horizontalError || 0);
+            const vErrors = deviceRows.map(r => Math.abs(r.verticalError || 0));
+            if (hErrors.length > 0 && vErrors.length > 0) {
+              const p80H = getPercentile(hErrors, 80);
+              const p80V = getPercentile(vErrors, 80);
+              techStringBreakdown = `${normTech}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+            }
+          }
+          csvContent += `${row.pointId},${row.floor},${row.horizontalError !== undefined ? row.horizontalError.toFixed(1) : ''},${row.verticalError !== undefined ? Math.abs(row.verticalError).toFixed(1) : ''},${row.locationSource || 'Unknown'},${normTech},${techStringBreakdown},${insightTags}\n`;
         });
         csvContent += "\n";
 
         // --- Horizontal Failures Section ---
         csvContent += "HORIZONTAL FAILURES\n";
-        csvContent += "Point ID,Floor,H-Error,V-Error,Location Source,Location Technology String,Insights\n";
+        csvContent += "Point ID,Floor,H-Error,V-Error,Location Source,Technology Usage,Technology String,Insights\n";
         allProcessedData.filter(row => row.horizontalError > 50).forEach(row => {
           const rootCauses = getRootCause(row, allProcessedData, weatherData);
           const insightTags = rootCauses.map(rc => rc.text).join(' | ');
-          csvContent += `${row.pointId},${row.floor},${row.horizontalError !== undefined ? row.horizontalError.toFixed(1) : ''},${row.verticalError !== undefined ? Math.abs(row.verticalError).toFixed(1) : ''},${row.locationSource || 'Unknown'},${row.tech || 'Unknown'},${insightTags}\n`;
+          // Normalize and deduplicate Technology Usage
+          const tech = row.tech || 'Unknown';
+          const normTech = typeof tech === 'string' ? tech.trim().toUpperCase() : tech;
+          // Technology String breakdown (combine errors for like tech)
+          let techStringBreakdown = '';
+          if (row.device) {
+            // Find all rows for this device and tech
+            const deviceRows = allProcessedData.filter(r => r.device === row.device && (typeof r.tech === 'string' ? r.tech.trim().toUpperCase() : r.tech) === normTech);
+            const hErrors = deviceRows.map(r => r.horizontalError || 0);
+            const vErrors = deviceRows.map(r => Math.abs(r.verticalError || 0));
+            if (hErrors.length > 0 && vErrors.length > 0) {
+              const p80H = getPercentile(hErrors, 80);
+              const p80V = getPercentile(vErrors, 80);
+              techStringBreakdown = `${normTech}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+            }
+          }
+          csvContent += `${row.pointId},${row.floor},${row.horizontalError !== undefined ? row.horizontalError.toFixed(1) : ''},${row.verticalError !== undefined ? Math.abs(row.verticalError).toFixed(1) : ''},${row.locationSource || 'Unknown'},${normTech},${techStringBreakdown},${insightTags}\n`;
         });
         csvContent += "\n";
 
