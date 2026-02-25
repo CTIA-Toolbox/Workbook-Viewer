@@ -51,8 +51,12 @@ export function processCorrelationData(workbook, groundTruth) {
 
         // Use pre-calculated Vertical Error column if available, otherwise calculate as absolute difference
 
-          // Store raw vertical error value
-          data.vErrorRaw = Number(row["Vertical Error"]) || (data.reportedAlt - truth.alt);
+
+          // Preserve raw bias for direction; use Number() to ensure it's not a string
+          // Use the same column as Summary tab: Altitude Error or Vertical Error
+          let vCol = row["Altitude Error"] !== undefined ? "Altitude Error" : "Vertical Error";
+          data.vBias = row[vCol] !== undefined ? Number(row[vCol]) : (data.reportedAlt - truth.alt);
+          data.verticalError = Math.abs(data.vBias); // Keep this for existing failure logic
 
         data.isWithinUncertainty = data.horizontalError <= data.uncertaintyH;
       }

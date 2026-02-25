@@ -212,7 +212,11 @@ function renderFailTable(stats) {
 
     for (const [device, data] of sortedDevices) {
       const p80H = getPercentile(data.hErrors, 80);
-      const p80V = getPercentile(data.vErrors, 80);
+      // Filter out non-numeric values and sort as numbers
+      const vErrors = data.vErrors
+        .filter(v => typeof v === 'number' && !isNaN(v))
+        .sort((a, b) => a - b);
+      const p80V = vErrors.length > 0 ? vErrors[Math.floor(vErrors.length * 0.8)] : 0;
 
       // Calculate average call setup and duration
       const setupVals = (data.rows || []).map(r => {
@@ -232,16 +236,32 @@ function renderFailTable(stats) {
       const avgSetup = setupVals.length ? (setupVals.reduce((a, b) => a + b, 0) / setupVals.length) : null;
       const avgTotal = totalVals.length ? (totalVals.reduce((a, b) => a + b, 0) / totalVals.length) : null;
 
-      // Calculate percentage for each technology
-      const techBreakdown = Object.entries(data.techMap)
+
+      // Normalize and combine technology keys to uppercase
+      const normalizedTechMap = {};
+      Object.entries(data.techMap).forEach(([tech, count]) => {
+        const key = tech.toUpperCase();
+        normalizedTechMap[key] = (normalizedTechMap[key] || 0) + count;
+      });
+      const techBreakdown = Object.entries(normalizedTechMap)
         .map(([tech, count]) => {
           const percentage = ((count / data.count) * 100).toFixed(0);
           return `${tech}: ${percentage}%`;
         })
         .join('<br>');
 
-      // Calculate P80 values for each Location Source
-      const sourceBreakdown = Object.entries(data.sourceErrorsMap)
+
+      // Normalize and combine Location Source keys to uppercase
+      const normalizedSourceErrorsMap = {};
+      Object.entries(data.sourceErrorsMap).forEach(([source, errors]) => {
+        const key = source.toUpperCase();
+        if (!normalizedSourceErrorsMap[key]) {
+          normalizedSourceErrorsMap[key] = { hErrors: [], vErrors: [] };
+        }
+        normalizedSourceErrorsMap[key].hErrors.push(...errors.hErrors);
+        normalizedSourceErrorsMap[key].vErrors.push(...errors.vErrors);
+      });
+      const sourceBreakdown = Object.entries(normalizedSourceErrorsMap)
         .map(([source, errors]) => {
           const p80H = getPercentile(errors.hErrors, 80);
           const p80V = getPercentile(errors.vErrors, 80);
@@ -249,8 +269,18 @@ function renderFailTable(stats) {
         })
         .join('<br>');
 
-      // Calculate P80 values for each Location Technology String
-      const techStringBreakdown = Object.entries(data.techStringErrorsMap)
+
+      // Normalize and combine Technology String keys to uppercase
+      const normalizedTechStringErrorsMap = {};
+      Object.entries(data.techStringErrorsMap).forEach(([techStr, errors]) => {
+        const key = techStr.toUpperCase();
+        if (!normalizedTechStringErrorsMap[key]) {
+          normalizedTechStringErrorsMap[key] = { hErrors: [], vErrors: [] };
+        }
+        normalizedTechStringErrorsMap[key].hErrors.push(...errors.hErrors);
+        normalizedTechStringErrorsMap[key].vErrors.push(...errors.vErrors);
+      });
+      const techStringBreakdown = Object.entries(normalizedTechStringErrorsMap)
         .map(([techStr, errors]) => {
           const p80H = getPercentile(errors.hErrors, 80);
           const p80V = getPercentile(errors.vErrors, 80);
@@ -352,14 +382,30 @@ function renderHorizontalFailures(data) {
   });
   
   // Build breakdown summary
-  const techBreakdown = Object.entries(techMap)
+  // Normalize and combine technology keys to uppercase
+  const normalizedTechMap = {};
+  Object.entries(techMap).forEach(([tech, count]) => {
+    const key = tech.toUpperCase();
+    normalizedTechMap[key] = (normalizedTechMap[key] || 0) + count;
+  });
+  const techBreakdown = Object.entries(normalizedTechMap)
     .map(([tech, count]) => {
       const percentage = ((count / failures.length) * 100).toFixed(0);
       return `${tech}: ${percentage}%`;
     })
     .join('<br>');
   
-  const sourceBreakdown = Object.entries(sourceErrorsMap)
+  // Normalize and combine Location Source keys to uppercase
+  const normalizedSourceErrorsMap = {};
+  Object.entries(sourceErrorsMap).forEach(([source, errors]) => {
+    const key = source.toUpperCase();
+    if (!normalizedSourceErrorsMap[key]) {
+      normalizedSourceErrorsMap[key] = { hErrors: [], vErrors: [] };
+    }
+    normalizedSourceErrorsMap[key].hErrors.push(...errors.hErrors);
+    normalizedSourceErrorsMap[key].vErrors.push(...errors.vErrors);
+  });
+  const sourceBreakdown = Object.entries(normalizedSourceErrorsMap)
     .map(([source, errors]) => {
       const count = errors.hErrors.length;
       const percentage = ((count / failures.length) * 100).toFixed(0);
@@ -369,7 +415,17 @@ function renderHorizontalFailures(data) {
     })
     .join('<br>');
   
-  const techStringBreakdown = Object.entries(techStringErrorsMap)
+  // Normalize and combine Technology String keys to uppercase
+  const normalizedTechStringErrorsMap = {};
+  Object.entries(techStringErrorsMap).forEach(([tech, errors]) => {
+    const key = tech.toUpperCase();
+    if (!normalizedTechStringErrorsMap[key]) {
+      normalizedTechStringErrorsMap[key] = { hErrors: [], vErrors: [] };
+    }
+    normalizedTechStringErrorsMap[key].hErrors.push(...errors.hErrors);
+    normalizedTechStringErrorsMap[key].vErrors.push(...errors.vErrors);
+  });
+  const techStringBreakdown = Object.entries(normalizedTechStringErrorsMap)
     .map(([tech, errors]) => {
       const count = errors.hErrors.length;
       const percentage = ((count / failures.length) * 100).toFixed(0);
@@ -418,7 +474,7 @@ function renderHorizontalFailures(data) {
         <td>${f.pointId}</td>
         <td>${f.floor}</td>
         <td class="text-danger fw-bold">${f.horizontalError.toFixed(1)}m</td>
-          <td>${f.vErrorRaw > 0 ? '↑' : '↓'} ${Math.abs(f.vErrorRaw).toFixed(1)}m</td>
+        <td>${f.vBias > 0 ? '↑' : '↓'} ${Math.abs(f.vBias).toFixed(1)}m</td>
         <td>${f.locationSource || 'Unknown'}</td>
         <td>${f.tech || 'Unknown'}</td>
         <td>${insightTags}</td>
@@ -1284,11 +1340,17 @@ function setupEventHandlers() {
         if (!allProcessedData || allProcessedData.length === 0) return;
 
         // 1. Calculate Summary Stats for the CSV Header
-        const hErrors = allProcessedData.map(d => d.horizontalError || 0);
-        const vErrors = allProcessedData.map(d => Math.abs(d.verticalError || 0));
-        const p80H = getPercentile(hErrors, 80);
-        const p80V = getPercentile(vErrors, 80);
-        const bias = calculateDirectionalBias(allProcessedData);
+
+          const hErrors = allProcessedData.map(d => d.horizontalError || 0);
+          // Filter out undefined/null, sort ascending, and pick the 80th percentile
+          const vErrors = allProcessedData
+            .map(d => d.verticalError)
+            .filter(v => v !== undefined && v !== null)
+            .sort((a, b) => a - b);
+          const index80 = Math.floor(vErrors.length * 0.8);
+          const p80V = vErrors.length > 0 ? vErrors[index80] : "N/A";
+          const p80H = getPercentile(hErrors, 80);
+          const bias = calculateDirectionalBias(allProcessedData);
 
         // 2. Build the CSV Content (mimic app layout)
         let csvContent = "data:text/csv;charset=utf-8,";
