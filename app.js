@@ -1233,7 +1233,7 @@ function setupEventHandlers() {
                 // Populate filters with defaults and apply them
                 populateFilters(allProcessedData);
                 applyFilters(); // This will update KPIs, insights, failing points, and status
-                document.getElementById('btn-export-kml').disabled = false;
+                // document.getElementById('btn-export-kml').disabled = false; // Removed: button no longer exists
                 document.getElementById('btn-export-csv').disabled = false;
             } else {
                 updateStatus('⚠ No data found in Correlation sheet');
