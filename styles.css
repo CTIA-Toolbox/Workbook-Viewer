@@ -1058,9 +1058,3 @@ input[type="file"], input[type="text"], select {
   opacity: 0.6;
   cursor: not-allowed;
 }
-
-@media (max-width: 900px) {
-    .failures-container-row {
-        flex-direction: column;
-    }
-}

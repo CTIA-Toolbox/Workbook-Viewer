@@ -1,44 +1,3 @@
-function generateInsights(processedRows) {
-  // Aggregate device-level statistics
-  const deviceStats = {};
-  processedRows.forEach(row => {
-    if (!deviceStats[row.device]) {
-      deviceStats[row.device] = {
-        count: 0,
-        hErrors: [],
-        vErrors: [],
-        techMap: {},
-        sourceErrorsMap: {},
-        techStringErrorsMap: {}
-      };
-    }
-    deviceStats[row.device].count += 1;
-    deviceStats[row.device].hErrors.push(row.horizontalError || 0);
-    deviceStats[row.device].vErrors.push(Math.abs(row.verticalError || 0));
-
-    // Technology Usage
-    const tech = row.tech || "Unknown";
-    const normTech = typeof tech === 'string' ? tech.trim().toUpperCase() : tech;
-    deviceStats[row.device].techMap[normTech] = (deviceStats[row.device].techMap[normTech] || 0) + 1;
-
-    // Source Errors Map
-    const source = row.locationSource || "Unknown";
-    if (!deviceStats[row.device].sourceErrorsMap[source]) {
-      deviceStats[row.device].sourceErrorsMap[source] = { hErrors: [], vErrors: [] };
-    }
-    deviceStats[row.device].sourceErrorsMap[source].hErrors.push(row.horizontalError || 0);
-    deviceStats[row.device].sourceErrorsMap[source].vErrors.push(Math.abs(row.verticalError || 0));
-
-    // Technology String Breakdown
-    if (!deviceStats[row.device].techStringErrorsMap[normTech]) {
-      deviceStats[row.device].techStringErrorsMap[normTech] = { hErrors: [], vErrors: [] };
-    }
-    deviceStats[row.device].techStringErrorsMap[normTech].hErrors.push(row.horizontalError || 0);
-    deviceStats[row.device].techStringErrorsMap[normTech].vErrors.push(Math.abs(row.verticalError || 0));
-  });
-
-  renderFailTable(deviceStats);
-}
 // app.js
 import { loadTestPoints } from './testPointLoader.js'; // Changed from loadBuildingData
 import { processCorrelationData } from './correlationReader.js';
@@ -66,42 +25,70 @@ async function init() {
   }
 }
 
-// --- FILTER & UI LOGIC ---
-
+// Populate all filter dropdowns
 function populateFilters(data) {
-    const populateDropdown = (id, fieldName) => {
-        const select = document.getElementById(id);
-        if (!select) return;
-        
-        // Clear existing except first
-        const firstOption = select.options[0];
-        select.innerHTML = '';
-        select.appendChild(firstOption);
+    // Helper to populate a dropdown
+    const populateDropdown = (id, fieldName, labelPrefix = '', defaultValue = null) => {
+      const select = document.getElementById(id);
+      if (!select) return;
 
-        const values = [...new Set(data.map(d => d[fieldName]))]
-            .filter(v => v !== undefined && v !== null && v !== '')
-            .sort();
+      let values = data.map(d => d[fieldName]).filter(v => v !== undefined && v !== null && v !== '');
 
-        values.forEach(val => {
-            const opt = document.createElement('option');
-            opt.value = val;
-            opt.textContent = val;
-            select.appendChild(opt);
+      // Special normalization for 'filter-location-tech-string': merge case-insensitive duplicates
+      if (id === 'filter-location-tech-string') {
+        // Map to canonical (uppercase) and deduplicate
+        const canonicalMap = {};
+        values.forEach(v => {
+          const upper = String(v).toUpperCase();
+          if (!(upper in canonicalMap)) {
+            canonicalMap[upper] = v; // preserve original casing of first occurrence
+          }
         });
+        values = Object.values(canonicalMap);
+      } else {
+        values = [...new Set(values)];
+      }
+
+      select.innerHTML = '<option value="all">All</option>';
+
+      values.sort((a, b) => {
+        if (typeof a === 'number' && typeof b === 'number') return a - b;
+        return String(a).localeCompare(String(b));
+      });
+
+      values.forEach(val => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = labelPrefix ? `${labelPrefix} ${val}` : val;
+        select.appendChild(opt);
+      });
+
+      // Set default value if specified
+      if (defaultValue !== null) {
+        // Try to find exact match (TRUE or true)
+        const matchingValue = values.find(v => String(v).toLowerCase() === String(defaultValue).toLowerCase());
+        if (matchingValue) {
+          select.value = matchingValue;
+        }
+      }
     };
 
-    populateDropdown('filter-floor', 'floor');
-    populateDropdown('filter-completed-call', 'completedCall');
-    populateDropdown('filter-correlated-call', 'correlatedCall');
+    // Populate all filters (with defaults for boolean fields)
+    populateDropdown('filter-floor', 'floor', 'Floor');
+    populateDropdown('filter-completed-call', 'completedCall', '', 'TRUE');
+    populateDropdown('filter-correlated-call', 'correlatedCall', '', 'TRUE');
     populateDropdown('filter-participant', 'participant');
     populateDropdown('filter-carrier', 'carrier');
     populateDropdown('filter-location-source', 'locationSource');
     populateDropdown('filter-summary-pool-tech', 'summaryPoolTech');
     populateDropdown('filter-location-tech-string', 'tech');
-    populateDropdown('filter-valid-horizontal', 'validHorizontal');
-    populateDropdown('filter-valid-vertical', 'validVertical');
+    // Normalize values to uppercase for dropdown population
+    const normalizeBool = val => String(val).toUpperCase();
+    populateDropdown('filter-valid-horizontal', 'validHorizontal', '', 'TRUE', normalizeBool);
+    populateDropdown('filter-valid-vertical', 'validVertical', '', 'TRUE', normalizeBool);
 }
 
+// Apply all active filters
 function applyFilters() {
     const filters = {
         floor: document.getElementById('filter-floor').value,
@@ -117,22 +104,27 @@ function applyFilters() {
     };
 
     const filtered = allProcessedData.filter(d => {
-        const matches = (dataVal, filterVal) => {
-            if (filterVal === 'all') return true;
-            if (dataVal === undefined || dataVal === null) return false;
-            return String(dataVal).trim().toLowerCase() === String(filterVal).trim().toLowerCase();
-        };
+      // Safe comparison helper: handles "TRUE" vs "true" and "all"
+      const matches = (dataVal, filterVal, field) => {
+        if (filterVal === 'all') return true;
+        // For Valid Horizontal/Vertical, normalize to uppercase
+        if (field === 'validHorizontal' || field === 'validVertical') {
+          return String(dataVal).toUpperCase() === String(filterVal).toUpperCase();
+        }
+        return String(dataVal).toLowerCase() === String(filterVal).toLowerCase();
+      };
 
-        return matches(d.floor, filters.floor) &&
-               matches(d.completedCall, filters.completedCall) &&
-               matches(d.correlatedCall, filters.correlatedCall) &&
-               matches(d.participant, filters.participant) &&
-               matches(d.carrier, filters.carrier) &&
-               matches(d.locationSource, filters.locationSource) &&
-               matches(d.summaryPoolTech, filters.summaryPoolTech) &&
-               matches(d.tech, filters.locationTechString) &&
-               matches(d.validHorizontal, filters.validHorizontal) &&
-               matches(d.validVertical, filters.validVertical);
+      if (!matches(d.floor, filters.floor, 'floor')) return false;
+      if (!matches(d.completedCall, filters.completedCall, 'completedCall')) return false;
+      if (!matches(d.correlatedCall, filters.correlatedCall, 'correlatedCall')) return false;
+      if (!matches(d.participant, filters.participant, 'participant')) return false;
+      if (!matches(d.carrier, filters.carrier, 'carrier')) return false;
+      if (!matches(d.locationSource, filters.locationSource, 'locationSource')) return false;
+      if (!matches(d.summaryPoolTech, filters.summaryPoolTech, 'summaryPoolTech')) return false;
+      if (!matches(d.tech, filters.locationTechString, 'tech')) return false; // Matches 'tech' from data
+      if (!matches(d.validHorizontal, filters.validHorizontal, 'validHorizontal')) return false;
+      if (!matches(d.validVertical, filters.validVertical, 'validVertical')) return false;
+      return true;
     });
 
     updateKPIs(filtered);
@@ -140,71 +132,461 @@ function applyFilters() {
     renderHorizontalFailures(filtered);
     renderVerticalFailures(filtered);
     
-    updateStatus(filtered.length < allProcessedData.length 
-        ? `✓ Showing ${filtered.length} of ${allProcessedData.length} entries` 
-        : `✓ Loaded ${allProcessedData.length} entries`);
+    if (filtered.length < allProcessedData.length) {
+      updateStatus(`✓ Showing ${filtered.length} of ${allProcessedData.length} entries (filtered)`);
+    } else {
+      updateStatus(`✓ Loaded ${allProcessedData.length} entries`);
+    }
 }
 
-// --- RENDERING FUNCTIONS ---
+function generateInsights(processedRows) {
+  const deviceStats = {};
+
+  processedRows.forEach(row => {
+    if (!deviceStats[row.device]) {
+      deviceStats[row.device] = { 
+        count: 0, 
+        hErrors: [], 
+        vErrors: [], 
+        techMap: {}, 
+        sourceErrorsMap: {},
+        techStringErrorsMap: {}
+      };
+    }
+    const stats = deviceStats[row.device];
+    stats.count++;
+    stats.hErrors.push(row.horizontalError || 0);
+    stats.vErrors.push(Math.abs(row.verticalError || 0));
+    stats.rows = stats.rows || [];
+    stats.rows.push(row);
+
+    // Track which Tech is being used
+    const tech = row.tech || "Unknown";
+    stats.techMap[tech] = (stats.techMap[tech] || 0) + 1;
+    
+    // Track errors by Location Source
+    const source = row.locationSource || "Unknown";
+    if (!stats.sourceErrorsMap[source]) {
+      stats.sourceErrorsMap[source] = { hErrors: [], vErrors: [] };
+    }
+    stats.sourceErrorsMap[source].hErrors.push(row.horizontalError || 0);
+    stats.sourceErrorsMap[source].vErrors.push(Math.abs(row.verticalError || 0));
+    
+    // Track errors by Location Technology String
+    const techString = row.tech || "Unknown";
+    if (!stats.techStringErrorsMap[techString]) {
+      stats.techStringErrorsMap[techString] = { hErrors: [], vErrors: [] };
+    }
+    stats.techStringErrorsMap[techString].hErrors.push(row.horizontalError || 0);
+    stats.techStringErrorsMap[techString].vErrors.push(Math.abs(row.verticalError || 0));
+  });
+
+  renderFailTable(deviceStats);
+}
+
+function renderFailTable(stats) {
+    const container = document.getElementById('insights-results');
+    
+    // Sort devices by P80 vertical error (worst to best)
+    const sortedDevices = Object.entries(stats).sort((a, b) => {
+      const p80A = getPercentile(a[1].vErrors, 80);
+      const p80B = getPercentile(b[1].vErrors, 80);
+      return p80B - p80A; // Descending order (worst first)
+    });
+    
+    let html = `
+    <table class="insight-table">
+      <thead>
+      <tr>
+        <th>Device</th>
+        <th>H 80%</th>
+        <th>V 80%</th>
+        <th>Avg Call Setup</th>
+        <th>Avg Call Duration</th>
+        <th>Technology Usage</th>
+        <th>Location Source<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
+        <th>Technology String<br><span style="font-size: 10px; font-weight: 400; color: var(--muted);">(P80 Breakdown)</span></th>
+      </tr>
+      </thead>
+      <tbody>`;
+
+    for (const [device, data] of sortedDevices) {
+      const p80H = getPercentile(data.hErrors, 80);
+      const p80V = getPercentile(data.vErrors, 80);
+
+      // Calculate average call setup and duration
+      const setupVals = (data.rows || []).map(r => {
+        let val = r.callSetupDuration;
+        if (typeof val === 'string') val = val.trim();
+        return safeNumber(val);
+      }).filter(v => v !== null);
+      const totalVals = (data.rows || []).map(r => {
+        let val = r.callTotalDuration;
+        if (typeof val === 'string') val = val.trim();
+        return safeNumber(val);
+      }).filter(v => v !== null);
+      // Debug log for tracing missing averages
+      console.log(`Device: ${device}`);
+      console.log('setupVals:', setupVals);
+      console.log('totalVals:', totalVals);
+      const avgSetup = setupVals.length ? (setupVals.reduce((a, b) => a + b, 0) / setupVals.length) : null;
+      const avgTotal = totalVals.length ? (totalVals.reduce((a, b) => a + b, 0) / totalVals.length) : null;
+
+      // Calculate percentage for each technology
+      const techBreakdown = Object.entries(data.techMap)
+        .map(([tech, count]) => {
+          const percentage = ((count / data.count) * 100).toFixed(0);
+          return `${tech}: ${percentage}%`;
+        })
+        .join('<br>');
+
+      // Calculate P80 values for each Location Source
+      const sourceBreakdown = Object.entries(data.sourceErrorsMap)
+        .map(([source, errors]) => {
+          const p80H = getPercentile(errors.hErrors, 80);
+          const p80V = getPercentile(errors.vErrors, 80);
+          return `${source}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+        })
+        .join('<br>');
+
+      // Calculate P80 values for each Location Technology String
+      const techStringBreakdown = Object.entries(data.techStringErrorsMap)
+        .map(([techStr, errors]) => {
+          const p80H = getPercentile(errors.hErrors, 80);
+          const p80V = getPercentile(errors.vErrors, 80);
+          return `${techStr}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
+        })
+        .join('<br>');
+
+      html += `
+      <tr>
+        <td>${device}</td>
+        <td class="${p80H > 50 ? 'text-danger fw-bold' : ''}">${p80H.toFixed(1)}m</td>
+        <td class="${p80V > 5 ? 'text-danger fw-bold' : ''}">${p80V.toFixed(1)}m</td>
+        <td>${avgSetup !== null ? avgSetup.toFixed(1) + 's' : '—'}</td>
+        <td>${avgTotal !== null ? avgTotal.toFixed(1) + 's' : '—'}</td>
+        <td class="p80-breakdown-cell">${techBreakdown}</td>
+        <td class="p80-breakdown-cell">${sourceBreakdown}</td>
+        <td class="p80-breakdown-cell">${techStringBreakdown}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
 
 function renderHorizontalFailures(data) {
-    const container = document.getElementById('h-failing-points-list');
-    if (!container) return;
-    container.innerHTML = '';
+  const container = document.getElementById('h-failing-points-list');
+  
+  // Filter for horizontal failures (H > 50m) and sort worst to best
+  const failures = data.filter(d => d.horizontalError > 50)
+    .sort((a, b) => b.horizontalError - a.horizontalError);
+  
+  if (failures.length === 0) {
+    container.innerHTML = '<div class="placeholder success">✅ No horizontal failures detected.</div>';
+    return;
+  }
 
-    const failures = data.filter(d => d.horizontalError > 50)
-                         .sort((a, b) => b.horizontalError - a.horizontalError);
+  // Calculate weather stats for root cause analysis
+  // Get pressure change between first and last test timestamp
+  const weatherStats = { pressureShift: 0 };
+  
+  // Helper to extract pressure from different field names
+  const getPressure = (d) => {
+    return d['Press. at building alt. (mbar)'] || 
+           d['Pressure (hPa)'] || 
+           d['Barometer Reading (hPa)'] || 
+           d.pressure || 
+           d.Pressure;
+  };
+  
+  // Helper to extract timestamp
+  const getTimestampFromData = (d) => {
+    return d['Time Stamp (UTC)'] || 
+           d['Date/Time (UTC)'] || 
+           d.timestamp || 
+           d.Timestamp;
+  };
+  
+  // Combine Weather and Barometric data
+  const allPressureData = [...weatherData, ...baroTrendData]
+    .map(d => ({
+      pressure: getPressure(d),
+      timestamp: getTimestampFromData(d)
+    }))
+    .filter(d => d.pressure !== undefined && d.timestamp !== undefined)
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  
+  if (allPressureData.length >= 2) {
+    const firstPressure = allPressureData[0].pressure;
+    const lastPressure = allPressureData[allPressureData.length - 1].pressure;
+    weatherStats.pressureShift = Math.abs(lastPressure - firstPressure);
+  }
 
-    if (failures.length === 0) {
-        container.innerHTML = '<p class="muted" style="padding:15px;">No horizontal failures (>50m) found.</p>';
-        return;
+  // Run root cause analysis
+  analyzeRootCauses(data);
+  const wifiDeadZones = detectWiFiDeadZones(failures, data);
+  const wifiDeadZoneMap = new Map(wifiDeadZones.map(w => [w.pointId, w.insight]));
+
+  // Calculate breakdown statistics
+  const techMap = {};
+  const sourceErrorsMap = {};
+  const techStringErrorsMap = {};
+  
+  failures.forEach(f => {
+    const tech = f.tech || 'Unknown';
+    const source = f.locationSource || 'Unknown';
+    
+    techMap[tech] = (techMap[tech] || 0) + 1;
+    
+    if (!sourceErrorsMap[source]) {
+      sourceErrorsMap[source] = { hErrors: [], vErrors: [] };
     }
+    sourceErrorsMap[source].hErrors.push(f.horizontalError || 0);
+    sourceErrorsMap[source].vErrors.push(Math.abs(f.verticalError || 0));
+    
+    if (!techStringErrorsMap[tech]) {
+      techStringErrorsMap[tech] = { hErrors: [], vErrors: [] };
+    }
+    techStringErrorsMap[tech].hErrors.push(f.horizontalError || 0);
+    techStringErrorsMap[tech].vErrors.push(Math.abs(f.verticalError || 0));
+  });
+  
+  // Build breakdown summary
+  const techBreakdown = Object.entries(techMap)
+    .map(([tech, count]) => {
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      return `${tech}: ${percentage}%`;
+    })
+    .join('<br>');
+  
+  const sourceBreakdown = Object.entries(sourceErrorsMap)
+    .map(([source, errors]) => {
+      const count = errors.hErrors.length;
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      const p80H = getPercentile(errors.hErrors, 80);
+      const p80V = getPercentile(errors.vErrors, 80);
+      return `${source}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
+    })
+    .join('<br>');
+  
+  const techStringBreakdown = Object.entries(techStringErrorsMap)
+    .map(([tech, errors]) => {
+      const count = errors.hErrors.length;
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      const p80H = getPercentile(errors.hErrors, 80);
+      const p80V = getPercentile(errors.vErrors, 80);
+      return `${tech}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
+    })
+    .join('<br>');
+  
+  let html = `
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; font-size: 12px;">
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Technology Usage</div>
+        <div class="p80-breakdown-cell">${techBreakdown}</div>
+      </div>
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Location Source<br><span style="font-size: 10px; font-weight: 400;">(% and P80 H/V)</span></div>
+        <div class="p80-breakdown-cell">${sourceBreakdown}</div>
+      </div>
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Technology String<br><span style="font-size: 10px; font-weight: 400;">(% and P80 H/V)</span></div>
+        <div class="p80-breakdown-cell">${techStringBreakdown}</div>
+      </div>
+    </div>
+    <table class="insight-table">
+      <thead>
+        <tr>
+          <th>Point ID</th>
+          <th>Floor</th>
+          <th>H-Error</th>
+          <th>V-Error</th>
+          <th>Location Source</th>
+          <th>Location Technology String</th>
+          <th>Insights</th>
+        </tr>
+      </thead>
+      <tbody>`;
 
-    failures.forEach(d => {
-        const div = document.createElement('div');
-        div.style = "padding: 10px; border-bottom: 1px solid #eee; background: #fff; margin-bottom: 4px;";
-        div.innerHTML = `
-            <div style="display:flex; justify-content:space-between;">
-                <strong>Point: ${d.pointId || 'Unknown'}</strong>
-                <span style="color:#d9534f; font-weight:bold;">${d.horizontalError.toFixed(1)}m Error</span>
-            </div>
-            <div style="font-size:0.85em; color:#666;">Source: ${d.locationSource || 'N/A'} | Tech: ${d.tech || 'N/A'}</div>
-        `;
-        container.appendChild(div);
-    });
+  failures.forEach(f => {
+    const rootCauses = getRootCause(f, data, weatherStats);
+    const insightTags = rootCauses.map(rc => 
+      `<span class="insight-tag tag-${rc.class}">${rc.text}</span>`
+    ).join(' ');
+    html += `
+      <tr>
+        <td>${f.pointId}</td>
+        <td>${f.floor}</td>
+        <td class="text-danger fw-bold">${f.horizontalError.toFixed(1)}m</td>
+        <td>${Math.abs(f.verticalError).toFixed(1)}m</td>
+        <td>${f.locationSource || 'Unknown'}</td>
+        <td>${f.tech || 'Unknown'}</td>
+        <td>${insightTags}</td>
+      </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
 }
 
 function renderVerticalFailures(data) {
-    const container = document.getElementById('vertical-failures-list');
-    if (!container) return;
-    container.innerHTML = '';
+  const container = document.getElementById('v-failing-points-list');
+  
+  // Filter for vertical failures (V > 5m) and sort worst to best
+  const failures = data.filter(d => Math.abs(d.verticalError) > 5)
+    .sort((a, b) => Math.abs(b.verticalError) - Math.abs(a.verticalError));
+  
+  if (failures.length === 0) {
+    container.innerHTML = '<div class="placeholder success">✅ No vertical failures detected.</div>';
+    return;
+  }
 
-    const failures = data.filter(d => Math.abs(d.verticalError) > 5)
-                         .sort((a, b) => Math.abs(b.verticalError) - Math.abs(a.verticalError));
+  // Calculate weather stats for root cause analysis
+  // Get pressure change between first and last test timestamp
+  const weatherStats = { pressureShift: 0 };
+  
+  // Helper to extract pressure from different field names
+  const getPressure = (d) => {
+    return d['Press. at building alt. (mbar)'] || 
+           d['Pressure (hPa)'] || 
+           d['Barometer Reading (hPa)'] || 
+           d.pressure || 
+           d.Pressure;
+  };
+  
+  // Helper to extract timestamp
+  const getTimestampFromData = (d) => {
+    return d['Time Stamp (UTC)'] || 
+           d['Date/Time (UTC)'] || 
+           d.timestamp || 
+           d.Timestamp;
+  };
+  
+  // Combine Weather and Barometric data
+  const allPressureData = [...weatherData, ...baroTrendData]
+    .map(d => ({
+      pressure: getPressure(d),
+      timestamp: getTimestampFromData(d)
+    }))
+    .filter(d => d.pressure !== undefined && d.timestamp !== undefined)
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  
+  if (allPressureData.length >= 2) {
+    const firstPressure = allPressureData[0].pressure;
+    const lastPressure = allPressureData[allPressureData.length - 1].pressure;
+    weatherStats.pressureShift = Math.abs(lastPressure - firstPressure);
+  }
 
-    if (failures.length === 0) {
-        container.innerHTML = '<p class="muted" style="padding:15px;">No vertical failures (>5m) found.</p>';
-        return;
+  // Detect WiFi dead zones
+  const wifiDeadZones = detectWiFiDeadZones(failures, data);
+  const wifiDeadZoneMap = new Map(wifiDeadZones.map(w => [w.pointId, w.insight]));
+
+  // Calculate breakdown statistics
+  const techMap = {};
+  const sourceErrorsMap = {};
+  const techStringErrorsMap = {};
+  
+  failures.forEach(f => {
+    const tech = f.tech || 'Unknown';
+    const source = f.locationSource || 'Unknown';
+    
+    techMap[tech] = (techMap[tech] || 0) + 1;
+    
+    if (!sourceErrorsMap[source]) {
+      sourceErrorsMap[source] = { hErrors: [], vErrors: [] };
     }
+    sourceErrorsMap[source].hErrors.push(f.horizontalError || 0);
+    sourceErrorsMap[source].vErrors.push(Math.abs(f.verticalError || 0));
+    
+    if (!techStringErrorsMap[tech]) {
+      techStringErrorsMap[tech] = { hErrors: [], vErrors: [] };
+    }
+    techStringErrorsMap[tech].hErrors.push(f.horizontalError || 0);
+    techStringErrorsMap[tech].vErrors.push(Math.abs(f.verticalError || 0));
+  });
+  
+  // Build breakdown summary
+  const techBreakdown = Object.entries(techMap)
+    .map(([tech, count]) => {
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      return `${tech}: ${percentage}%`;
+    })
+    .join('<br>');
+  
+  const sourceBreakdown = Object.entries(sourceErrorsMap)
+    .map(([source, errors]) => {
+      const count = errors.hErrors.length;
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      const p80H = getPercentile(errors.hErrors, 80);
+      const p80V = getPercentile(errors.vErrors, 80);
+      return `${source}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
+    })
+    .join('<br>');
+  
+  const techStringBreakdown = Object.entries(techStringErrorsMap)
+    .map(([tech, errors]) => {
+      const count = errors.hErrors.length;
+      const percentage = ((count / failures.length) * 100).toFixed(0);
+      const p80H = getPercentile(errors.hErrors, 80);
+      const p80V = getPercentile(errors.vErrors, 80);
+      return `${tech}: ${percentage}% (${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m)`;
+    })
+    .join('<br>');
+  
+  let html = renderSmartInsights();
+  
+  html += `
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; font-size: 12px;">
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Technology Usage</div>
+        <div class="p80-breakdown-cell">${techBreakdown}</div>
+      </div>
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Location Source<br><span style="font-size: 10px; font-weight: 400;">(% and P80 H/V)</span></div>
+        <div class="p80-breakdown-cell">${sourceBreakdown}</div>
+      </div>
+      <div>
+        <div style="font-weight: 500; margin-bottom: 6px; color: var(--muted);">Technology String<br><span style="font-size: 10px; font-weight: 400;">(% and P80 H/V)</span></div>
+        <div class="p80-breakdown-cell">${techStringBreakdown}</div>
+      </div>
+    </div>
+    <table class="insight-table">
+      <thead>
+        <tr>
+          <th>Point ID</th>
+          <th>Floor</th>
+          <th>H-Error</th>
+          <th>V-Error</th>
+          <th>Location Source</th>
+          <th>Location Technology String</th>
+          <th>Insights</th>
+        </tr>
+      </thead>
+      <tbody>`;
 
-    failures.forEach(d => {
-        const div = document.createElement('div');
-        div.style = "padding: 10px; border-bottom: 1px solid #eee; background: #fff; margin-bottom: 4px;";
-        div.innerHTML = `
-            <div style="display:flex; justify-content:space-between;">
-                <strong>Point: ${d.pointId || 'Unknown'}</strong>
-                <span style="color:#d9534f; font-weight:bold;">${Math.abs(d.verticalError).toFixed(1)}m Error</span>
-            </div>
-            <div style="font-size:0.85em; color:#666;">Floor: ${d.floor || 'N/A'} | Tech: ${d.tech || 'N/A'}</div>
-        `;
-        container.appendChild(div);
-    });
+  failures.forEach(f => {
+    const rootCauses = getRootCause(f, data, weatherStats);
+    const insightTags = rootCauses.map(rc => 
+      `<span class="insight-tag tag-${rc.class}">${rc.text}</span>`
+    ).join(' ');
+    html += `
+      <tr>
+        <td>${f.pointId}</td>
+        <td>${f.floor}</td>
+        <td>${f.horizontalError.toFixed(1)}m</td>
+        <td class="text-danger fw-bold">${Math.abs(f.verticalError).toFixed(1)}m</td>
+        <td>${f.locationSource || 'Unknown'}</td>
+        <td>${f.tech || 'Unknown'}</td>
+        <td>${insightTags}</td>
+      </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
 }
 
-// --- HELPER FUNCTIONS ---
-
-// Initialize the app
-init();
+// ============================================================================
+// ROOT CAUSE ANALYSIS ENGINE
 // ============================================================================
 
 function analyzeRootCauses(data) {
@@ -593,18 +975,15 @@ function calculateDirectionalBias(processedRows) {
   
   let verticalBias = 0;
   let verticalDisplay = '';
+  
   if (validAltRows.length > 0) {
     const avgAltDelta = validAltRows.reduce((sum, d) => sum + (d.reportedAlt - d.truthAlt), 0) / validAltRows.length;
     verticalBias = avgAltDelta;
-    let arrow = '';
-    if (verticalBias > 0.01) {
-      arrow = '↑';
-    } else if (verticalBias < -0.01) {
-      arrow = '↓';
-    } else {
-      arrow = '↕'; // Neutral arrow for zero
+    
+    if (Math.abs(verticalBias) > 0.5) {
+      const arrow = verticalBias > 0 ? '↑' : '↓';
+      verticalDisplay = ` ${arrow}${Math.abs(verticalBias).toFixed(1)}m`;
     }
-    verticalDisplay = ` ${arrow}${Math.abs(verticalBias).toFixed(1)}m`;
   }
   
   // Determine horizontal cardinal direction
@@ -626,17 +1005,18 @@ function calculateDirectionalBias(processedRows) {
   if (!direction) direction = 'Centered';
   
   // Build display string
-  let displayString = '';
-  if (verticalDisplay) {
-    // Make vertical bias primary and prominent
-    displayString += `<span style="font-size:1.2em;font-weight:600;">${verticalDisplay.trim()}</span>`;
-  }
+  let displayParts = [];
   if (horizontalMagnitude >= 1) {
-    displayString += ` <span style="font-size:0.9em;">${horizontalMagnitude.toFixed(1)}m <small>${direction}</small></span>`;
+    displayParts.push(`${horizontalMagnitude.toFixed(1)}m <small>${direction}</small>`);
   }
-  if (!displayString) displayString = '<small>Minimal</small>';
+  if (verticalDisplay) {
+    displayParts.push(`<small>${verticalDisplay}</small>`);
+  }
+  
+  const displayString = displayParts.length > 0 ? displayParts.join(' ') : '<small>Minimal</small>';
+  
   return {
-    display: displayString.trim(),
+    display: displayString,
     magnitude: horizontalMagnitude,
     direction,
     verticalBias
@@ -836,7 +1216,7 @@ function setupEventHandlers() {
                 // Populate filters with defaults and apply them
                 populateFilters(allProcessedData);
                 applyFilters(); // This will update KPIs, insights, failing points, and status
-                // document.getElementById('btn-export-kml').disabled = false; // Removed: button no longer exists
+                document.getElementById('btn-export-kml').disabled = false;
                 document.getElementById('btn-export-csv').disabled = false;
             } else {
                 updateStatus('⚠ No data found in Correlation sheet');
@@ -925,7 +1305,7 @@ function setupEventHandlers() {
 
         // --- Device Performance Insights Section (device-level aggregation) ---
         csvContent += "DEVICE PERFORMANCE INSIGHTS\n";
-        csvContent += "Device,H 80%,V 80%,Avg Call Setup,Avg Call Duration,Technology Usage,Technology String Breakdown\n";
+        csvContent += "Device,H 80%,V 80%,Avg Call Setup,Avg Call Duration\n";
         // Build deviceStats as in generateInsights
         const deviceStats = {};
         allProcessedData.forEach(row => {
@@ -934,96 +1314,40 @@ function setupEventHandlers() {
               hErrors: [],
               vErrors: [],
               callSetup: [],
-              callDuration: [],
-              techMap: {},
-              techStringErrorsMap: {}
+              callDuration: []
             };
           }
           deviceStats[row.device].hErrors.push(row.horizontalError || 0);
           deviceStats[row.device].vErrors.push(Math.abs(row.verticalError || 0));
           if (row.callSetupDuration !== undefined) deviceStats[row.device].callSetup.push(row.callSetupDuration);
           if (row.callTotalDuration !== undefined) deviceStats[row.device].callDuration.push(row.callTotalDuration);
-          // Technology Usage
-          const tech = row.tech || "Unknown";
-          const normTech = typeof tech === 'string' ? tech.trim().toUpperCase() : tech;
-          deviceStats[row.device].techMap[normTech] = (deviceStats[row.device].techMap[normTech] || 0) + 1;
-          // Technology String Breakdown
-          if (!deviceStats[row.device].techStringErrorsMap[normTech]) {
-            deviceStats[row.device].techStringErrorsMap[normTech] = { hErrors: [], vErrors: [] };
-          }
-          deviceStats[row.device].techStringErrorsMap[normTech].hErrors.push(row.horizontalError || 0);
-          deviceStats[row.device].techStringErrorsMap[normTech].vErrors.push(Math.abs(row.verticalError || 0));
         });
         Object.entries(deviceStats).forEach(([device, stats]) => {
           const h80 = getPercentile(stats.hErrors, 80).toFixed(1);
           const v80 = getPercentile(stats.vErrors, 80).toFixed(1);
           const avgSetup = stats.callSetup.length ? (stats.callSetup.reduce((a,b)=>a+b,0)/stats.callSetup.length).toFixed(1) : '';
           const avgDuration = stats.callDuration.length ? (stats.callDuration.reduce((a,b)=>a+b,0)/stats.callDuration.length).toFixed(1) : '';
-          // Combine Technology Usage
-          const techUsage = Object.entries(stats.techMap)
-            .map(([tech, count]) => `${tech}: ${((count / stats.hErrors.length) * 100).toFixed(0)}%`)
-            .join(' | ');
-          // Combine Technology String Breakdown
-          const techStringBreakdown = Object.entries(stats.techStringErrorsMap)
-            .map(([techStr, errors]) => {
-              const p80H = getPercentile(errors.hErrors, 80);
-              const p80V = getPercentile(errors.vErrors, 80);
-              return `${techStr}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
-            })
-            .join(' | ');
-          csvContent += `${device},${h80},${v80},${avgSetup},${avgDuration},${techUsage},${techStringBreakdown}\n`;
+          csvContent += `${device},${h80},${v80},${avgSetup},${avgDuration}\n`;
         });
         csvContent += "\n";
 
         // --- Vertical Failures Section ---
         csvContent += "VERTICAL FAILURES\n";
-        csvContent += "Point ID,Floor,H-Error,V-Error,Location Source,Technology Usage,Technology String,Insights\n";
+        csvContent += "Point ID,Floor,H-Error,V-Error,Location Source,Location Technology String,Insights\n";
         allProcessedData.filter(row => Math.abs(row.verticalError) > 5).forEach(row => {
           const rootCauses = getRootCause(row, allProcessedData, weatherData);
           const insightTags = rootCauses.map(rc => rc.text).join(' | ');
-          // Normalize and deduplicate Technology Usage
-          const tech = row.tech || 'Unknown';
-          const normTech = typeof tech === 'string' ? tech.trim().toUpperCase() : tech;
-          // Technology String breakdown (combine errors for like tech)
-          let techStringBreakdown = '';
-          if (row.device) {
-            // Find all rows for this device and tech
-            const deviceRows = allProcessedData.filter(r => r.device === row.device && (typeof r.tech === 'string' ? r.tech.trim().toUpperCase() : r.tech) === normTech);
-            const hErrors = deviceRows.map(r => r.horizontalError || 0);
-            const vErrors = deviceRows.map(r => Math.abs(r.verticalError || 0));
-            if (hErrors.length > 0 && vErrors.length > 0) {
-              const p80H = getPercentile(hErrors, 80);
-              const p80V = getPercentile(vErrors, 80);
-              techStringBreakdown = `${normTech}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
-            }
-          }
-          csvContent += `${row.pointId},${row.floor},${row.horizontalError !== undefined ? row.horizontalError.toFixed(1) : ''},${row.verticalError !== undefined ? Math.abs(row.verticalError).toFixed(1) : ''},${row.locationSource || 'Unknown'},${normTech},${techStringBreakdown},${insightTags}\n`;
+          csvContent += `${row.pointId},${row.floor},${row.horizontalError !== undefined ? row.horizontalError.toFixed(1) : ''},${row.verticalError !== undefined ? Math.abs(row.verticalError).toFixed(1) : ''},${row.locationSource || 'Unknown'},${row.tech || 'Unknown'},${insightTags}\n`;
         });
         csvContent += "\n";
 
         // --- Horizontal Failures Section ---
         csvContent += "HORIZONTAL FAILURES\n";
-        csvContent += "Point ID,Floor,H-Error,V-Error,Location Source,Technology Usage,Technology String,Insights\n";
+        csvContent += "Point ID,Floor,H-Error,V-Error,Location Source,Location Technology String,Insights\n";
         allProcessedData.filter(row => row.horizontalError > 50).forEach(row => {
           const rootCauses = getRootCause(row, allProcessedData, weatherData);
           const insightTags = rootCauses.map(rc => rc.text).join(' | ');
-          // Normalize and deduplicate Technology Usage
-          const tech = row.tech || 'Unknown';
-          const normTech = typeof tech === 'string' ? tech.trim().toUpperCase() : tech;
-          // Technology String breakdown (combine errors for like tech)
-          let techStringBreakdown = '';
-          if (row.device) {
-            // Find all rows for this device and tech
-            const deviceRows = allProcessedData.filter(r => r.device === row.device && (typeof r.tech === 'string' ? r.tech.trim().toUpperCase() : r.tech) === normTech);
-            const hErrors = deviceRows.map(r => r.horizontalError || 0);
-            const vErrors = deviceRows.map(r => Math.abs(r.verticalError || 0));
-            if (hErrors.length > 0 && vErrors.length > 0) {
-              const p80H = getPercentile(hErrors, 80);
-              const p80V = getPercentile(vErrors, 80);
-              techStringBreakdown = `${normTech}: ${p80H.toFixed(1)}m / ${p80V.toFixed(1)}m`;
-            }
-          }
-          csvContent += `${row.pointId},${row.floor},${row.horizontalError !== undefined ? row.horizontalError.toFixed(1) : ''},${row.verticalError !== undefined ? Math.abs(row.verticalError).toFixed(1) : ''},${row.locationSource || 'Unknown'},${normTech},${techStringBreakdown},${insightTags}\n`;
+          csvContent += `${row.pointId},${row.floor},${row.horizontalError !== undefined ? row.horizontalError.toFixed(1) : ''},${row.verticalError !== undefined ? Math.abs(row.verticalError).toFixed(1) : ''},${row.locationSource || 'Unknown'},${row.tech || 'Unknown'},${insightTags}\n`;
         });
         csvContent += "\n";
 
